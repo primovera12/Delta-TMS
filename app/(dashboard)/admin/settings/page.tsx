@@ -385,9 +385,17 @@ export default function AdminSettingsPage() {
 
         {/* Integrations */}
         <TabsContent value="integrations" className="mt-6 space-y-6">
+          <Alert variant="info">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Integration Setup Required</AlertTitle>
+            <AlertDescription>
+              Configure your API keys in environment variables to enable integrations. Contact support for setup assistance.
+            </AlertDescription>
+          </Alert>
+
           <Card>
             <CardHeader>
-              <CardTitle>Connected Services</CardTitle>
+              <CardTitle>External Services</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -401,7 +409,7 @@ export default function AdminSettingsPage() {
                       <p className="text-sm text-gray-500">Transactional emails and notifications</p>
                     </div>
                   </div>
-                  <Badge variant="success">Connected</Badge>
+                  <Badge variant="secondary">Not Configured</Badge>
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-4">
@@ -413,7 +421,7 @@ export default function AdminSettingsPage() {
                       <p className="text-sm text-gray-500">SMS notifications and reminders</p>
                     </div>
                   </div>
-                  <Badge variant="success">Connected</Badge>
+                  <Badge variant="secondary">Not Configured</Badge>
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-4">
@@ -425,7 +433,31 @@ export default function AdminSettingsPage() {
                       <p className="text-sm text-gray-500">Payment processing</p>
                     </div>
                   </div>
-                  <Badge variant="success">Connected</Badge>
+                  <Badge variant="secondary">Not Configured</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>GPS & Fleet Tracking</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center">
+                      <Globe className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">Bouncie GPS Tracking</p>
+                      <p className="text-sm text-gray-500">Real-time vehicle location and fleet behavior analytics</p>
+                    </div>
+                  </div>
+                  <a href="/admin/settings/integrations/bouncie">
+                    <Button variant="primary" size="sm">Configure</Button>
+                  </a>
                 </div>
                 <div className="flex items-center justify-between p-4 rounded-lg border border-gray-200">
                   <div className="flex items-center gap-4">
@@ -437,7 +469,7 @@ export default function AdminSettingsPage() {
                       <p className="text-sm text-gray-500">Connect to healthcare systems</p>
                     </div>
                   </div>
-                  <Button variant="secondary" size="sm">Configure</Button>
+                  <Badge variant="secondary">Coming Soon</Badge>
                 </div>
               </div>
             </CardContent>

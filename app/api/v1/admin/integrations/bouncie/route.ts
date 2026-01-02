@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { bouncieService, type BouncieCredentials } from '@/lib/services/bouncie';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 
 // Allowed roles for Bouncie configuration
 const ALLOWED_ROLES = ['SUPER_ADMIN', 'ADMIN'];

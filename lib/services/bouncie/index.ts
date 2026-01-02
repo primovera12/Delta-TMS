@@ -13,7 +13,7 @@
  * - Webhooks for real-time events
  */
 
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import type {
   BouncieConfig,
   BouncieDevice,

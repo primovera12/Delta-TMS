@@ -2,6 +2,9 @@ import { DashboardLayout } from '@/components/layout';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 
+// Prevent static prerendering of dispatcher pages
+export const dynamic = 'force-dynamic';
+
 export default async function DispatcherLayout({
   children,
 }: {

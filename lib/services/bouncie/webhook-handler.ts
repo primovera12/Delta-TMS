@@ -4,7 +4,7 @@
  * Processes incoming webhooks from Bouncie and updates device records.
  */
 
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { bouncieService } from './index';
 import type { BounceEventType } from '@prisma/client';
 

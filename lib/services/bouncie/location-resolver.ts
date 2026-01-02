@@ -9,7 +9,7 @@
  * This ensures the system works perfectly without Bouncie.
  */
 
-import { prisma } from '@/lib/prisma';
+import { prisma } from '@/lib/db';
 import { bouncieService, type LocationResult } from './index';
 
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes

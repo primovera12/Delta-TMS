@@ -59,15 +59,16 @@ const dispatcherNav: NavGroup[] = [
     items: [
       { title: 'Patients', href: '/dispatcher/patients', icon: Users },
       { title: 'Drivers', href: '/dispatcher/drivers', icon: Truck },
-      { title: 'Facilities', href: '/dispatcher/facilities', icon: Building2 },
       { title: 'Standing Orders', href: '/dispatcher/standing-orders', icon: Clock },
+      { title: 'Routes', href: '/dispatcher/routes', icon: MapPin },
     ],
   },
   {
-    title: 'Reports',
+    title: 'Tools',
     items: [
-      { title: 'Analytics', href: '/dispatcher/analytics', icon: BarChart3 },
-      { title: 'Reports', href: '/dispatcher/reports', icon: FileText },
+      { title: 'Scheduler', href: '/dispatcher/scheduler', icon: Calendar },
+      { title: 'Conflicts', href: '/dispatcher/conflicts', icon: Clock },
+      { title: 'Will Call', href: '/dispatcher/will-call', icon: Car },
     ],
   },
 ];
@@ -78,7 +79,6 @@ const driverNav: NavGroup[] = [
       { title: 'Dashboard', href: '/driver', icon: LayoutDashboard },
       { title: 'My Trips', href: '/driver/trips', icon: Car },
       { title: 'Schedule', href: '/driver/schedule', icon: Calendar },
-      { title: 'Navigation', href: '/driver/navigation', icon: MapPin },
     ],
   },
   {
@@ -86,7 +86,7 @@ const driverNav: NavGroup[] = [
     items: [
       { title: 'Earnings', href: '/driver/earnings', icon: CreditCard },
       { title: 'Documents', href: '/driver/documents', icon: FileText },
-      { title: 'Vehicle', href: '/driver/vehicle', icon: Truck },
+      { title: 'Profile', href: '/driver/profile', icon: User },
     ],
   },
 ];
@@ -96,15 +96,24 @@ const adminNav: NavGroup[] = [
     items: [
       { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
       { title: 'Users', href: '/admin/users', icon: Users },
+      { title: 'Patients', href: '/admin/patients', icon: Users },
       { title: 'Vehicles', href: '/admin/vehicles', icon: Truck },
       { title: 'Facilities', href: '/admin/facilities', icon: Building2 },
     ],
   },
   {
+    title: 'Finance',
+    items: [
+      { title: 'Billing', href: '/admin/billing', icon: CreditCard },
+      { title: 'Pricing', href: '/admin/pricing', icon: CreditCard },
+      { title: 'Timesheets', href: '/admin/timesheets', icon: Clock },
+    ],
+  },
+  {
     title: 'Configuration',
     items: [
-      { title: 'Pricing', href: '/admin/pricing', icon: CreditCard },
       { title: 'Settings', href: '/admin/settings', icon: Settings },
+      { title: 'Shifts', href: '/admin/shifts', icon: Clock },
       { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
     ],
   },
@@ -114,7 +123,7 @@ const facilityNav: NavGroup[] = [
   {
     items: [
       { title: 'Dashboard', href: '/facility', icon: LayoutDashboard },
-      { title: 'Book Trip', href: '/facility/book', icon: Car },
+      { title: 'Book Trip', href: '/facility/trips/new', icon: Car },
       { title: 'Patients', href: '/facility/patients', icon: Users },
       { title: 'Trips', href: '/facility/trips', icon: Calendar },
     ],
@@ -123,7 +132,7 @@ const facilityNav: NavGroup[] = [
     title: 'Billing',
     items: [
       { title: 'Invoices', href: '/facility/invoices', icon: FileText },
-      { title: 'Standing Orders', href: '/facility/standing-orders', icon: Clock },
+      { title: 'Users', href: '/facility/users', icon: Users },
     ],
   },
 ];
@@ -132,9 +141,10 @@ const patientNav: NavGroup[] = [
   {
     items: [
       { title: 'Dashboard', href: '/patient', icon: LayoutDashboard },
-      { title: 'Book Trip', href: '/patient/book', icon: Car },
+      { title: 'Book Trip', href: '/patient/trips/new', icon: Car },
       { title: 'My Trips', href: '/patient/trips', icon: Calendar },
-      { title: 'History', href: '/patient/history', icon: Clock },
+      { title: 'Trip History', href: '/patient/trips/history', icon: Clock },
+      { title: 'Settings', href: '/patient/settings', icon: Settings },
     ],
   },
 ];

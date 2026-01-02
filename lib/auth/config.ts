@@ -60,6 +60,24 @@ export const authConfig: NextAuthConfig = {
           };
         }
 
+        if (email === 'facility@delta.com' && password === 'password123') {
+          return {
+            id: '4',
+            email: 'facility@delta.com',
+            name: 'Demo Facility',
+            role: 'FACILITY_STAFF',
+          };
+        }
+
+        if (email === 'patient@delta.com' && password === 'password123') {
+          return {
+            id: '5',
+            email: 'patient@delta.com',
+            name: 'Demo Patient',
+            role: 'PATIENT',
+          };
+        }
+
         return null;
       },
     }),

@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 import { cn } from '@/lib/utils/cn';
 import {
   Bell,
@@ -35,6 +37,7 @@ interface TopbarProps {
   sidebarCollapsed?: boolean;
   onMenuClick?: () => void;
   showSearch?: boolean;
+  portal?: 'dispatcher' | 'driver' | 'admin' | 'facility' | 'patient' | 'family';
   user?: {
     name: string;
     email: string;
@@ -57,12 +60,22 @@ export function Topbar({
   sidebarCollapsed,
   onMenuClick,
   showSearch = true,
+  portal,
   user,
   notifications = [],
   actions,
 }: TopbarProps) {
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const pathname = usePathname();
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Determine portal from pathname if not provided
+  const currentPortal = portal || pathname.split('/')[1] || 'dispatcher';
+
+  // Build profile and settings URLs based on portal
+  const profileUrl = currentPortal === 'driver' ? '/driver/profile' : `/${currentPortal}`;
+  const settingsUrl = currentPortal === 'admin' ? '/admin/settings' :
+                      currentPortal === 'patient' ? '/patient/settings' : `/${currentPortal}`;
 
   return (
     <header
@@ -228,20 +241,29 @@ export function Topbar({
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                Profile
+              <DropdownMenuItem asChild>
+                <Link href={profileUrl}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link href={settingsUrl}>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <HelpCircle className="mr-2 h-4 w-4" />
-                Help & Support
+              <DropdownMenuItem asChild>
+                <Link href="mailto:support@delta-tms.com">
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  Help & Support
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive">
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => signOut({ callbackUrl: '/login' })}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>

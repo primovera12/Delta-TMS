@@ -175,11 +175,18 @@ function LoginForm() {
 
         {/* Demo credentials */}
         <div className="mt-6 rounded-lg bg-gray-50 p-4 text-sm">
-          <p className="font-medium text-gray-700 mb-2">Demo Accounts:</p>
-          <div className="space-y-1 text-gray-600">
-            <p><span className="font-mono">admin@delta.com</span> / password123</p>
-            <p><span className="font-mono">dispatcher@delta.com</span> / password123</p>
-            <p><span className="font-mono">driver@delta.com</span> / password123</p>
+          <p className="font-medium text-gray-700 mb-2">Demo Accounts (password: password123):</p>
+          <div className="grid grid-cols-2 gap-1 text-gray-600">
+            <p><span className="font-mono text-xs">admin@delta.com</span></p>
+            <p className="text-right text-xs text-gray-500">Admin</p>
+            <p><span className="font-mono text-xs">dispatcher@delta.com</span></p>
+            <p className="text-right text-xs text-gray-500">Dispatcher</p>
+            <p><span className="font-mono text-xs">driver@delta.com</span></p>
+            <p className="text-right text-xs text-gray-500">Driver</p>
+            <p><span className="font-mono text-xs">facility@delta.com</span></p>
+            <p className="text-right text-xs text-gray-500">Facility</p>
+            <p><span className="font-mono text-xs">patient@delta.com</span></p>
+            <p className="text-right text-xs text-gray-500">Patient</p>
           </div>
         </div>
       </CardContent>
