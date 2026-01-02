@@ -152,14 +152,19 @@ export default function ShiftManagementPage() {
 
   const fetchDrivers = async () => {
     try {
-      const response = await fetch('/api/v1/drivers?status=active&limit=100');
+      // Fetch all drivers (not just active) for shift scheduling
+      const response = await fetch('/api/v1/drivers?limit=100');
       const data = await response.json();
 
-      if (data.success) {
+      if (data.success && data.data?.drivers) {
         setDrivers(data.data.drivers);
+      } else {
+        // Fallback for empty response
+        setDrivers([]);
       }
     } catch (error) {
       console.error('Failed to fetch drivers:', error);
+      setDrivers([]);
     }
   };
 

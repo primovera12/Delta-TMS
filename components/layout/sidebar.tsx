@@ -79,11 +79,13 @@ const driverNav: NavGroup[] = [
       { title: 'Dashboard', href: '/driver', icon: LayoutDashboard },
       { title: 'My Trips', href: '/driver/trips', icon: Car },
       { title: 'Schedule', href: '/driver/schedule', icon: Calendar },
+      { title: 'Inspection', href: '/driver/inspection', icon: FileText },
     ],
   },
   {
     title: 'Account',
     items: [
+      { title: 'Timesheet', href: '/driver/timesheet', icon: Clock },
       { title: 'Earnings', href: '/driver/earnings', icon: CreditCard },
       { title: 'Documents', href: '/driver/documents', icon: FileText },
       { title: 'Profile', href: '/driver/profile', icon: User },
@@ -95,8 +97,10 @@ const adminNav: NavGroup[] = [
   {
     items: [
       { title: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+      { title: 'Rides', href: '/admin/rides', icon: Car },
       { title: 'Users', href: '/admin/users', icon: Users },
       { title: 'Patients', href: '/admin/patients', icon: Users },
+      { title: 'Drivers', href: '/admin/drivers', icon: Truck },
       { title: 'Vehicles', href: '/admin/vehicles', icon: Truck },
       { title: 'Facilities', href: '/admin/facilities', icon: Building2 },
     ],
@@ -113,8 +117,10 @@ const adminNav: NavGroup[] = [
     title: 'Configuration',
     items: [
       { title: 'Settings', href: '/admin/settings', icon: Settings },
+      { title: 'Integrations', href: '/admin/integrations', icon: Settings },
       { title: 'Shifts', href: '/admin/shifts', icon: Clock },
       { title: 'Reports', href: '/admin/reports', icon: BarChart3 },
+      { title: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     ],
   },
 ];
@@ -144,7 +150,32 @@ const patientNav: NavGroup[] = [
       { title: 'Book Trip', href: '/patient/trips/new', icon: Car },
       { title: 'My Trips', href: '/patient/trips', icon: Calendar },
       { title: 'Trip History', href: '/patient/trips/history', icon: Clock },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { title: 'Profile', href: '/patient/profile', icon: User },
+      { title: 'Payment', href: '/patient/payment', icon: CreditCard },
       { title: 'Settings', href: '/patient/settings', icon: Settings },
+    ],
+  },
+];
+
+const familyNav: NavGroup[] = [
+  {
+    items: [
+      { title: 'Dashboard', href: '/family', icon: LayoutDashboard },
+      { title: 'My Patients', href: '/family/patients', icon: Users },
+      { title: 'Book Ride', href: '/family/book', icon: Car },
+      { title: 'Rides', href: '/family/rides', icon: Calendar },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { title: 'Profile', href: '/family/profile', icon: User },
+      { title: 'Settings', href: '/family/settings', icon: Settings },
     ],
   },
 ];
@@ -174,8 +205,9 @@ export function Sidebar({ portal, user }: SidebarProps) {
       case 'facility':
         return facilityNav;
       case 'patient':
-      case 'family':
         return patientNav;
+      case 'family':
+        return familyNav;
       default:
         return dispatcherNav;
     }

@@ -18,7 +18,9 @@
       "Bash(npm run build:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nConnect admin pages to real database with Prisma\n\n- Update /api/v1/patients route to use Prisma for CRUD operations\n- Update /api/v1/users route to use Prisma for CRUD operations\n- Create admin patients page with real data fetching\n- Update admin users page with real data fetching\n- Add loading states, error handling, and form validation\n- Add table and collapsible UI components\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir /b \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\admin\")",
+      "Bash(if not exist \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\" mkdir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\")"
     ]
   }
 }
