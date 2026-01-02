@@ -98,7 +98,7 @@ export function Topbar({
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Search trips, patients, drivers..."
-                className="w-64 pl-9 lg:w-80"
+                className="w-48 pl-9 md:w-64 lg:w-80"
               />
             </div>
           </div>
@@ -115,7 +115,7 @@ export function Topbar({
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="md:hidden h-11 w-11"
             onClick={() => setSearchOpen(true)}
           >
             <Search className="h-5 w-5" />
@@ -125,7 +125,7 @@ export function Topbar({
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button variant="ghost" size="icon" className="relative h-11 w-11">
               <Bell className="h-5 w-5" />
               {unreadCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error-500 text-[10px] font-medium text-white">
@@ -134,7 +134,7 @@ export function Topbar({
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-80 max-w-sm">
             <DropdownMenuLabel className="flex items-center justify-between">
               <span>Notifications</span>
               {unreadCount > 0 && (
@@ -211,7 +211,7 @@ export function Topbar({
                 <ChevronDown className="hidden lg:block h-4 w-4 text-gray-400" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-56 max-w-xs">
               <DropdownMenuLabel>
                 <div className="flex flex-col">
                   <span className="font-medium">{user.name}</span>
@@ -253,7 +253,7 @@ export function Topbar({
                 autoFocus
               />
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setSearchOpen(false)}>
+            <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setSearchOpen(false)}>
               <X className="h-5 w-5" />
             </Button>
           </div>
