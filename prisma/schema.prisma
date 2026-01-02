@@ -828,7 +828,7 @@ model Trip {
   
   // Trip type and linking
   tripType                TripType        @default(ONE_WAY)
-  linkedTripId            String?         // For round trips - links outbound/return
+  linkedTripId            String?         @unique // For round trips - links outbound/return
   linkedTrip              Trip?           @relation("LinkedTrips", fields: [linkedTripId], references: [id])
   linkedTripReverse       Trip?           @relation("LinkedTrips")
   
