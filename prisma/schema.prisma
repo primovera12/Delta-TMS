@@ -417,6 +417,7 @@ model DriverProfile {
   vehicles                    Vehicle[]
   trips                       Trip[]
   timesheets                  Timesheet[]
+  scheduledShifts             ScheduledShift[]
   availability                DriverAvailability[]
   timeOffRequests             DriverTimeOff[]
   documents                   DriverDocument[]
@@ -426,7 +427,7 @@ model DriverProfile {
   mileageLogs                 MileageLog[]
   geofenceEvents              GeofenceEvent[]
   emergencyAlerts             EmergencyAlert[]
-  
+
   @@index([status])
   @@index([licenseExpiry])
 }
@@ -584,6 +585,42 @@ model Timesheet {
   updatedAt       DateTime      @updatedAt
   
   @@unique([driverId, date])
+  @@index([driverId])
+  @@index([date])
+  @@index([status])
+}
+
+model ScheduledShift {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+
+  // Schedule
+  date            DateTime      @db.Date
+  startTime       String        // "06:00" format for flexibility
+  endTime         String        // "14:00" format
+  shiftType       String        @default("regular") // regular, overtime, on_call
+
+  // Assignment
+  assignedBy      String?
+  assignedAt      DateTime      @default(now())
+
+  // Status
+  status          String        @default("scheduled") // scheduled, confirmed, started, completed, cancelled, no_show
+  confirmedAt     DateTime?
+
+  // Notes
+  notes           String?
+
+  // Recurrence (for repeating shifts)
+  isRecurring     Boolean       @default(false)
+  recurrenceRule  String?       // RRULE format: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+  parentShiftId   String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([driverId, date, startTime])
   @@index([driverId])
   @@index([date])
   @@index([status])

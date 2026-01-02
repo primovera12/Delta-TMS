@@ -9,9 +9,9 @@
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| ✅ Completed | 81 | Tasks fully implemented |
+| ✅ Completed | 84 | Tasks fully implemented |
 | 🔄 In Progress | 0 | Currently being worked on |
-| 📋 Pending | 19 | Not yet started |
+| 📋 Pending | 16 | Not yet started |
 | ❌ Blocked/Error | 0 | Has issues that need resolution |
 
 ### Session Progress (January 2, 2026)
@@ -26,6 +26,9 @@
 - ✅ Added invoice email sending with SendGrid integration
 - ✅ Created payment tracking UI for invoices
 - ✅ Implemented QuickBooks integration for invoice sync
+- ✅ Built timesheet list and approval page
+- ✅ Created driver shift management system with recurring shifts
+- ✅ Added route overview page with optimization suggestions
 
 ---
 
@@ -274,12 +277,12 @@
 ### Day 63-64: Schedule Calendar ✅
 - [x] Schedule page (`app/(dashboard)/dispatcher/schedule/page.tsx`)
 
-### Day 65-70: Operations Features 📋 PENDING
+### Day 65-70: Operations Features - PARTIALLY COMPLETE
 - [ ] Conflict visualization
 - [ ] Drag-drop scheduling
-- [ ] Timesheet list and approval
-- [ ] Shift management
-- [ ] Route overview
+- [x] Timesheet list and approval (`app/(dashboard)/admin/timesheets/page.tsx`, `app/api/v1/timesheets/route.ts`)
+- [x] Shift management (`app/(dashboard)/admin/shifts/page.tsx`, `app/api/v1/shifts/route.ts`, ScheduledShift model)
+- [x] Route overview (`app/(dashboard)/dispatcher/routes/page.tsx`)
 
 ---
 
