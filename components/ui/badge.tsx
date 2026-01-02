@@ -13,6 +13,7 @@ const badgeVariants = cva(
         success: 'bg-success-50 text-success-700',
         warning: 'bg-warning-50 text-warning-700',
         error: 'bg-error-50 text-error-700',
+        destructive: 'bg-error-50 text-error-700',
         info: 'bg-info-50 text-info-700',
         outline: 'border border-gray-200 text-gray-700 bg-transparent',
         // Trip status variants

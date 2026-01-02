@@ -391,7 +391,7 @@ export default function UserDetailPage() {
             <CardContent>
               <div className="grid gap-4">
                 {permissionModules.map((module) => {
-                  const permissions = mockUser.permissions[module.key as keyof typeof mockUser.permissions] || [];
+                  const permissions: string[] = mockUser.permissions[module.key as keyof typeof mockUser.permissions] || [];
                   return (
                     <div key={module.key} className="flex items-center justify-between p-4 border rounded-lg">
                       <div>

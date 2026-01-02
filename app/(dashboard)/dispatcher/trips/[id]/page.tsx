@@ -194,7 +194,7 @@ export default function TripDetailPage() {
     }
   }, [tripId]);
 
-  const handleCancelTrip = async (reason: string) => {
+  const handleCancelTrip = async (reason: string, notes: string, notifyPatient: boolean) => {
     try {
       const response = await fetch(`/api/v1/trips/${tripId}/status`, {
         method: 'PUT',
@@ -202,6 +202,8 @@ export default function TripDetailPage() {
         body: JSON.stringify({
           newStatus: 'CANCELLED',
           cancellationReason: reason,
+          cancellationNotes: notes,
+          notifyPatient,
         }),
       });
 
@@ -677,7 +679,17 @@ export default function TripDetailPage() {
       {/* Modals */}
       {showCancelModal && (
         <TripCancellationModal
-          tripNumber={trip.tripNumber}
+          trip={{
+            id: trip.tripNumber,
+            patientName: primaryPassenger ? `${primaryPassenger.firstName} ${primaryPassenger.lastName}` : 'Unknown',
+            date: format(new Date(trip.scheduledPickupTime), 'MMM d, yyyy'),
+            time: format(new Date(trip.scheduledPickupTime), 'h:mm a'),
+            pickup: `${trip.pickupAddressLine1}, ${trip.pickupCity}`,
+            dropoff: `${trip.dropoffAddressLine1}, ${trip.dropoffCity}`,
+            status: trip.status,
+            vehicleType: trip.vehicleType,
+            driverName: trip.driver ? `${trip.driver.user.firstName} ${trip.driver.user.lastName}` : undefined,
+          }}
           isOpen={showCancelModal}
           onClose={() => setShowCancelModal(false)}
           onConfirm={handleCancelTrip}
@@ -686,7 +698,17 @@ export default function TripDetailPage() {
 
       {showAssignModal && (
         <TripAssignmentModal
-          tripId={trip.id}
+          trip={{
+            id: trip.id,
+            patientName: primaryPassenger ? `${primaryPassenger.firstName} ${primaryPassenger.lastName}` : 'Unknown',
+            patientPhone: primaryPassenger?.phone || '',
+            pickupAddress: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState}`,
+            pickupTime: format(new Date(trip.scheduledPickupTime), 'h:mm a'),
+            dropoffAddress: `${trip.dropoffAddressLine1}, ${trip.dropoffCity}, ${trip.dropoffState}`,
+            appointmentTime: format(new Date(trip.scheduledPickupTime), 'h:mm a'),
+            vehicleType: trip.vehicleType,
+            status: trip.status,
+          }}
           isOpen={showAssignModal}
           onClose={() => setShowAssignModal(false)}
           onAssign={handleAssignDriver}

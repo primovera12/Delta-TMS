@@ -13,6 +13,7 @@ const alertVariants = cva(
         success: 'bg-success-50 text-success-700 border-success-200 [&>svg]:text-success-600',
         warning: 'bg-warning-50 text-warning-700 border-warning-200 [&>svg]:text-warning-600',
         error: 'bg-error-50 text-error-700 border-error-200 [&>svg]:text-error-600',
+        destructive: 'bg-error-50 text-error-700 border-error-200 [&>svg]:text-error-600',
       },
     },
     defaultVariants: {
@@ -27,6 +28,7 @@ const iconMap = {
   success: CheckCircle2,
   warning: AlertTriangle,
   error: XCircle,
+  destructive: XCircle,
 };
 
 const Alert = React.forwardRef<

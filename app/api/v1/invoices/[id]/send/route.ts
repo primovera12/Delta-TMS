@@ -17,11 +17,7 @@ export async function POST(
     const invoice = await prisma.invoice.findUnique({
       where: { id },
       include: {
-        facility: {
-          include: {
-            billingContact: true,
-          },
-        },
+        facility: true,
       },
     });
 
@@ -32,9 +28,8 @@ export async function POST(
       );
     }
 
-    // Get recipient email
-    const recipientEmail =
-      invoice.facility.billingEmail || invoice.facility.billingContact?.email;
+    // Get recipient email (from facility billing email)
+    const recipientEmail = invoice.facility.billingEmail || invoice.facility.email;
 
     if (!recipientEmail) {
       return NextResponse.json(
@@ -43,12 +38,8 @@ export async function POST(
       );
     }
 
-    // Get recipient name
-    const recipientName =
-      invoice.facility.billingContactName ||
-      (invoice.facility.billingContact
-        ? `${invoice.facility.billingContact.firstName} ${invoice.facility.billingContact.lastName}`
-        : invoice.facility.name);
+    // Get recipient name (from billing contact name or facility name)
+    const recipientName = invoice.facility.billingContactName || invoice.facility.name;
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.deltatransport.com';
 

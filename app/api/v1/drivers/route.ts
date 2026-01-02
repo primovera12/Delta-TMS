@@ -114,13 +114,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // First, create the user
+    // First, create the user with a temporary password (to be changed on first login)
+    const bcrypt = await import('bcryptjs');
+    const tempPasswordHash = await bcrypt.hash('TempPassword123!', 10);
+
     const user = await prisma.user.create({
       data: {
         firstName: body.firstName,
         lastName: body.lastName,
         email: body.email,
         phone: body.phone,
+        passwordHash: tempPasswordHash,
         role: 'DRIVER',
         status: 'ACTIVE',
       },

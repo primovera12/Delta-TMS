@@ -112,7 +112,7 @@ export default function DispatcherMapPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleDriverClick = (driver: (typeof drivers)[0]) => {
+  const handleDriverClick = (driver: { id: string }) => {
     setSelectedDriver(driver.id === selectedDriver ? null : driver.id);
   };
 

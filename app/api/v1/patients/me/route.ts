@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
         savedAddresses: {
           orderBy: { createdAt: 'desc' },
         },
-        emergencyContacts: true,
       },
     });
 
@@ -33,7 +32,7 @@ export async function GET(request: NextRequest) {
       email: user.email,
       phone: user.phone,
       dateOfBirth: user.dateOfBirth?.toISOString().split('T')[0] || null,
-      address: user.savedAddresses.find(a => a.label === 'Home') || null,
+      address: user.savedAddresses.find((a: { label: string }) => a.label === 'Home') || null,
       medicalProfile: user.medicalProfile ? {
         mobilityStatus: user.medicalProfile.mobilityAids?.[0] || 'ambulatory',
         mobilityAids: user.medicalProfile.mobilityAids || [],
@@ -49,13 +48,13 @@ export async function GET(request: NextRequest) {
         hearingImpaired: user.medicalProfile.hearingImpaired,
         visuallyImpaired: user.medicalProfile.visuallyImpaired,
       } : null,
-      emergencyContact: user.emergencyContacts[0] ? {
-        name: user.emergencyContacts[0].name,
-        relationship: user.emergencyContacts[0].relationship,
-        phone: user.emergencyContacts[0].phone,
+      emergencyContact: user.medicalProfile?.emergencyContactName ? {
+        name: user.medicalProfile.emergencyContactName,
+        relationship: user.medicalProfile.emergencyContactRelationship,
+        phone: user.medicalProfile.emergencyContactPhone,
       } : null,
       notificationPreferences: {
-        tripReminders: user.tripRemindersEnabled,
+        tripReminders: user.smsNotificationsEnabled, // Using smsNotificationsEnabled as proxy for trip reminders
         smsNotifications: user.smsNotificationsEnabled,
         emailNotifications: user.emailNotificationsEnabled,
         reminderHours: user.reminderHoursBefore,
@@ -137,31 +136,40 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update medical profile
-    if (medicalProfile) {
+    // Update medical profile (including emergency contact which is stored in medicalProfile)
+    if (medicalProfile || emergencyContact) {
       const existingMedical = await prisma.medicalProfile.findUnique({
         where: { userId: session.user.id },
       });
 
-      const medicalData = {
-        mobilityAids: medicalProfile.mobilityAids ||
-          (medicalProfile.mobilityStatus ? [medicalProfile.mobilityStatus] : []),
-        wheelchairType: medicalProfile.wheelchairType,
-        oxygenRequired: medicalProfile.requiresOxygen || false,
-        canTransferIndependently: !medicalProfile.requiresAttendant,
-        cognitiveNotes: medicalProfile.specialNeeds,
-        allergies: typeof medicalProfile.allergies === 'string'
+      const medicalData: Record<string, unknown> = {};
+
+      if (medicalProfile) {
+        medicalData.mobilityAids = medicalProfile.mobilityAids ||
+          (medicalProfile.mobilityStatus ? [medicalProfile.mobilityStatus] : []);
+        medicalData.wheelchairType = medicalProfile.wheelchairType;
+        medicalData.oxygenRequired = medicalProfile.requiresOxygen || false;
+        medicalData.canTransferIndependently = !medicalProfile.requiresAttendant;
+        medicalData.cognitiveNotes = medicalProfile.specialNeeds;
+        medicalData.allergies = typeof medicalProfile.allergies === 'string'
           ? medicalProfile.allergies.split(',').map((s: string) => s.trim()).filter(Boolean)
-          : medicalProfile.allergies || [],
-        medications: typeof medicalProfile.medications === 'string'
+          : medicalProfile.allergies || [];
+        medicalData.medications = typeof medicalProfile.medications === 'string'
           ? medicalProfile.medications.split(',').map((s: string) => s.trim()).filter(Boolean)
-          : medicalProfile.medications || [],
-        medicalConditions: medicalProfile.medicalConditions || [],
-        weightLbs: medicalProfile.weightLbs,
-        heightInches: medicalProfile.heightInches,
-        hearingImpaired: medicalProfile.hearingImpaired || false,
-        visuallyImpaired: medicalProfile.visuallyImpaired || false,
-      };
+          : medicalProfile.medications || [];
+        medicalData.medicalConditions = medicalProfile.medicalConditions || [];
+        medicalData.weightLbs = medicalProfile.weightLbs;
+        medicalData.heightInches = medicalProfile.heightInches;
+        medicalData.hearingImpaired = medicalProfile.hearingImpaired || false;
+        medicalData.visuallyImpaired = medicalProfile.visuallyImpaired || false;
+      }
+
+      // Emergency contact is stored in MedicalProfile
+      if (emergencyContact) {
+        medicalData.emergencyContactName = emergencyContact.name;
+        medicalData.emergencyContactRelationship = emergencyContact.relationship;
+        medicalData.emergencyContactPhone = emergencyContact.phone;
+      }
 
       if (existingMedical) {
         await prisma.medicalProfile.update({
@@ -178,42 +186,12 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Update emergency contact
-    if (emergencyContact) {
-      const existingContact = await prisma.emergencyContact.findFirst({
-        where: { userId: session.user.id },
-        orderBy: { priority: 'asc' },
-      });
-
-      const contactData = {
-        name: emergencyContact.name,
-        relationship: emergencyContact.relationship,
-        phone: emergencyContact.phone,
-      };
-
-      if (existingContact) {
-        await prisma.emergencyContact.update({
-          where: { id: existingContact.id },
-          data: contactData,
-        });
-      } else {
-        await prisma.emergencyContact.create({
-          data: {
-            userId: session.user.id,
-            priority: 1,
-            ...contactData,
-          },
-        });
-      }
-    }
-
     // Update notification preferences
     if (notificationPreferences) {
       await prisma.user.update({
         where: { id: session.user.id },
         data: {
-          tripRemindersEnabled: notificationPreferences.tripReminders,
-          smsNotificationsEnabled: notificationPreferences.smsNotifications,
+          smsNotificationsEnabled: notificationPreferences.smsNotifications ?? notificationPreferences.tripReminders,
           emailNotificationsEnabled: notificationPreferences.emailNotifications,
           reminderHoursBefore: notificationPreferences.reminderHours,
         },

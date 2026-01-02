@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
         },
         driverId: driverId || undefined,
         status: {
-          notIn: ['cancelled', 'completed'],
+          notIn: ['CANCELLED', 'COMPLETED'],
         },
       },
       include: {

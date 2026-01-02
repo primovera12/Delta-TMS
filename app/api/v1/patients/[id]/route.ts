@@ -22,10 +22,12 @@ export async function GET(
         savedAddresses: {
           orderBy: { createdAt: 'desc' },
         },
-        emergencyContacts: true,
-        tripsAsPatient: {
+        tripsAsPassenger: {
           take: 10,
-          orderBy: { scheduledPickupTime: 'desc' },
+          orderBy: { trip: { scheduledPickupTime: 'desc' } },
+          include: {
+            trip: true,
+          },
         },
       },
     });
@@ -45,7 +47,7 @@ export async function GET(
       dateOfBirth: user.dateOfBirth?.toISOString().split('T')[0] || null,
       status: user.status,
       role: user.role,
-      address: user.savedAddresses.find(a => a.label === 'Home') || null,
+      address: user.savedAddresses.find((a: { label: string }) => a.label === 'Home') || null,
       savedAddresses: user.savedAddresses,
       medicalProfile: user.medicalProfile ? {
         mobilityStatus: user.medicalProfile.mobilityAids?.[0] || 'ambulatory',
@@ -58,17 +60,17 @@ export async function GET(
         medications: user.medicalProfile.medications || [],
         medicalConditions: user.medicalProfile.medicalConditions || [],
       } : null,
-      emergencyContact: user.emergencyContacts[0] ? {
-        name: user.emergencyContacts[0].name,
-        relationship: user.emergencyContacts[0].relationship,
-        phone: user.emergencyContacts[0].phone,
+      emergencyContact: user.medicalProfile?.emergencyContactName ? {
+        name: user.medicalProfile.emergencyContactName,
+        relationship: user.medicalProfile.emergencyContactRelationship,
+        phone: user.medicalProfile.emergencyContactPhone,
       } : null,
       stats: {
-        totalTrips: user.tripsAsPatient.length,
-        upcomingTrips: user.tripsAsPatient.filter(t =>
-          t.status === 'SCHEDULED' && new Date(t.scheduledPickupTime) > new Date()
+        totalTrips: user.tripsAsPassenger.length,
+        upcomingTrips: user.tripsAsPassenger.filter((tp: { trip: { status: string; scheduledPickupTime: Date } }) =>
+          tp.trip.status === 'CONFIRMED' && new Date(tp.trip.scheduledPickupTime) > new Date()
         ).length,
-        cancelledTrips: user.tripsAsPatient.filter(t => t.status === 'CANCELLED').length,
+        cancelledTrips: user.tripsAsPassenger.filter((tp: { trip: { status: string } }) => tp.trip.status === 'CANCELLED').length,
       },
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
@@ -120,27 +122,36 @@ export async function PUT(
       });
     }
 
-    // Update medical profile
-    if (medicalProfile) {
+    // Update medical profile (including emergency contact which is stored in medicalProfile)
+    if (medicalProfile || emergencyContact) {
       const existingMedical = await prisma.medicalProfile.findUnique({
         where: { userId: id },
       });
 
-      const medicalData = {
-        mobilityAids: medicalProfile.mobilityAids ||
-          (medicalProfile.mobilityStatus ? [medicalProfile.mobilityStatus] : []),
-        wheelchairType: medicalProfile.wheelchairType,
-        oxygenRequired: medicalProfile.requiresOxygen || false,
-        canTransferIndependently: !medicalProfile.requiresAttendant,
-        cognitiveNotes: medicalProfile.specialNeeds,
-        allergies: Array.isArray(medicalProfile.allergies)
+      const medicalData: Record<string, unknown> = {};
+
+      if (medicalProfile) {
+        medicalData.mobilityAids = medicalProfile.mobilityAids ||
+          (medicalProfile.mobilityStatus ? [medicalProfile.mobilityStatus] : []);
+        medicalData.wheelchairType = medicalProfile.wheelchairType;
+        medicalData.oxygenRequired = medicalProfile.requiresOxygen || false;
+        medicalData.canTransferIndependently = !medicalProfile.requiresAttendant;
+        medicalData.cognitiveNotes = medicalProfile.specialNeeds;
+        medicalData.allergies = Array.isArray(medicalProfile.allergies)
           ? medicalProfile.allergies
-          : medicalProfile.allergies?.split(',').map((s: string) => s.trim()).filter(Boolean) || [],
-        medications: Array.isArray(medicalProfile.medications)
+          : medicalProfile.allergies?.split(',').map((s: string) => s.trim()).filter(Boolean) || [];
+        medicalData.medications = Array.isArray(medicalProfile.medications)
           ? medicalProfile.medications
-          : medicalProfile.medications?.split(',').map((s: string) => s.trim()).filter(Boolean) || [],
-        medicalConditions: medicalProfile.medicalConditions || [],
-      };
+          : medicalProfile.medications?.split(',').map((s: string) => s.trim()).filter(Boolean) || [];
+        medicalData.medicalConditions = medicalProfile.medicalConditions || [];
+      }
+
+      // Emergency contact is stored in MedicalProfile
+      if (emergencyContact) {
+        medicalData.emergencyContactName = emergencyContact.name;
+        medicalData.emergencyContactRelationship = emergencyContact.relationship;
+        medicalData.emergencyContactPhone = emergencyContact.phone;
+      }
 
       if (existingMedical) {
         await prisma.medicalProfile.update({
@@ -152,35 +163,6 @@ export async function PUT(
           data: {
             userId: id,
             ...medicalData,
-          },
-        });
-      }
-    }
-
-    // Update emergency contact
-    if (emergencyContact) {
-      const existingContact = await prisma.emergencyContact.findFirst({
-        where: { userId: id },
-        orderBy: { priority: 'asc' },
-      });
-
-      const contactData = {
-        name: emergencyContact.name,
-        relationship: emergencyContact.relationship,
-        phone: emergencyContact.phone,
-      };
-
-      if (existingContact) {
-        await prisma.emergencyContact.update({
-          where: { id: existingContact.id },
-          data: contactData,
-        });
-      } else {
-        await prisma.emergencyContact.create({
-          data: {
-            userId: id,
-            priority: 1,
-            ...contactData,
           },
         });
       }
