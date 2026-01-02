@@ -226,6 +226,9 @@ model User {
   updatedAt             DateTime             @updatedAt
   lastLoginAt           DateTime?
   
+  // Stripe
+  stripeCustomerId      String?
+
   // Relations
   medicalProfile        MedicalProfile?
   driverProfile         DriverProfile?

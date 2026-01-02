@@ -9,9 +9,9 @@
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| ✅ Completed | 63 | Tasks fully implemented |
+| ✅ Completed | 69 | Tasks fully implemented |
 | 🔄 In Progress | 0 | Currently being worked on |
-| 📋 Pending | 37 | Not yet started |
+| 📋 Pending | 31 | Not yet started |
 | ❌ Blocked/Error | 0 | Has issues that need resolution |
 
 ### Session Progress (January 2, 2026)
@@ -22,6 +22,7 @@
 - ✅ Created full ride detail page with status timeline
 - ✅ Implemented driver clock in/out system
 - ✅ Set up Twilio SMS notifications with auto-notifications on status change
+- ✅ Implemented Stripe payment integration with payment collection modal
 
 ---
 
@@ -114,11 +115,13 @@
 - [x] Keyboard shortcuts (Ctrl+Enter to submit)
 - [x] Live price preview with distance calculation
 
-### Day 18: Payment Collection 📋 PENDING
-- [ ] Stripe integration
-- [ ] PaymentCollectionModal component
-- [ ] Card-not-present support
-- [ ] Payment API endpoints
+### Day 18: Payment Collection ✅
+- [x] Stripe integration (`lib/services/stripe.ts`)
+- [x] PaymentCollectionModal component (`components/domain/payment-collection-modal.tsx`)
+- [x] PaymentMethods management component (`components/domain/payment-methods.tsx`)
+- [x] Card-not-present support
+- [x] Payment API endpoints (`/api/v1/payments/intent`, `/methods`, `/refund`, `/setup`)
+- [x] Stripe webhook handler (`/api/v1/webhooks/stripe`)
 
 ### Day 19-20: Driver Assignment ✅
 - [x] Trip assignment modal (`components/domain/trip-assignment-modal.tsx`)
@@ -383,13 +386,14 @@
 | Timesheet | ✅ | `lib/services/timesheet.ts` |
 | SMS / Twilio | ✅ | `lib/services/sms.ts` |
 | Reminder Scheduler | ✅ | `lib/services/reminder-scheduler.ts` |
+| Stripe Payment | ✅ | `lib/services/stripe.ts` |
 
 ---
 
 ## Pending High Priority Tasks
 
 1. ~~**Google Maps Integration** - Address autocomplete and distance calculation~~ ✅ DONE
-2. **Stripe Payment Integration** - Payment collection and processing
+2. ~~**Stripe Payment Integration** - Payment collection and processing~~ ✅ DONE
 3. ~~**Twilio SMS Integration** - Notification system~~ ✅ DONE
 4. ~~**Driver Status Update Flow** - Real-time status transitions~~ ✅ DONE
 5. ~~**Quick Book Form** - Optimized dispatcher booking form~~ ✅ DONE

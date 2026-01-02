@@ -13,3 +13,5 @@ export { QuickBookForm } from './quick-book-form';
 export { DriverStatusUpdate } from './driver-status-update';
 export { TripStatusTimeline } from './trip-status-timeline';
 export { DriverClock } from './driver-clock';
+export { PaymentCollectionModal } from './payment-collection-modal';
+export { PaymentMethods } from './payment-methods';
