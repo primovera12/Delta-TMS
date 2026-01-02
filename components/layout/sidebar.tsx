@@ -95,17 +95,33 @@ const driverNav: NavGroup[] = [
       { title: 'Dashboard', href: '/driver', icon: LayoutDashboard },
       { title: 'My Trips', href: '/driver/trips', icon: Car },
       { title: 'Schedule', href: '/driver/schedule', icon: Calendar },
-      { title: 'Inspection', href: '/driver/inspection', icon: FileText },
+      { title: 'My Vehicle', href: '/driver/vehicle', icon: Truck },
       { title: 'Notifications', href: '/driver/notifications', icon: Bell },
+    ],
+  },
+  {
+    title: 'Daily Tasks',
+    items: [
+      { title: 'Inspection', href: '/driver/inspection', icon: FileText },
+      { title: 'Incident Report', href: '/driver/incident', icon: AlertTriangle },
     ],
   },
   {
     title: 'Account',
     items: [
       { title: 'Availability', href: '/driver/availability', icon: Calendar },
+      { title: 'Time Off', href: '/driver/time-off', icon: Clock },
       { title: 'Timesheet', href: '/driver/timesheet', icon: Clock },
       { title: 'Earnings', href: '/driver/earnings', icon: CreditCard },
+      { title: 'Tax Documents', href: '/driver/tax', icon: FileText },
+    ],
+  },
+  {
+    title: 'Compliance',
+    items: [
       { title: 'Documents', href: '/driver/documents', icon: FileText },
+      { title: 'Training', href: '/driver/training', icon: GraduationCap },
+      { title: 'Background', href: '/driver/background', icon: Shield },
       { title: 'Profile', href: '/driver/profile', icon: User },
     ],
   },
