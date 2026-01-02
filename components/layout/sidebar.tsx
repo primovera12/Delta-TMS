@@ -166,6 +166,7 @@ const patientNav: NavGroup[] = [
       { title: 'Dashboard', href: '/patient', icon: LayoutDashboard },
       { title: 'Book Trip', href: '/patient/trips/new', icon: Car },
       { title: 'My Trips', href: '/patient/trips', icon: Calendar },
+      { title: 'Standing Orders', href: '/patient/standing-orders', icon: Clock },
       { title: 'Trip History', href: '/patient/trips/history', icon: Clock },
     ],
   },
