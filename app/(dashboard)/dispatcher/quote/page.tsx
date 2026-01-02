@@ -13,7 +13,7 @@ import {
   Plus,
   Minus,
   Users,
-  Wheelchair,
+  Accessibility,
   Stethoscope,
   Calendar,
   FileText,
@@ -68,7 +68,7 @@ const defaultRates: PricingRates = {
 
 const transportTypes = [
   { id: 'ambulatory', label: 'Ambulatory', icon: Users, surcharge: 0 },
-  { id: 'wheelchair', label: 'Wheelchair', icon: Wheelchair, surcharge: 15 },
+  { id: 'wheelchair', label: 'Wheelchair', icon: Accessibility, surcharge: 15 },
   { id: 'stretcher', label: 'Stretcher', icon: Stethoscope, surcharge: 45 },
   { id: 'bariatric', label: 'Bariatric', icon: Users, surcharge: 35 },
 ];

@@ -36,7 +36,7 @@ import {
   Plus,
   Star,
   Heart,
-  Wheelchair,
+  Accessibility,
   User,
   FileText,
 } from 'lucide-react';
@@ -260,7 +260,7 @@ export default function FamilyPatientDetailPage() {
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-100 rounded-lg">
-                <Wheelchair className="h-5 w-5 text-purple-600" />
+                <Accessibility className="h-5 w-5 text-purple-600" />
               </div>
               <div>
                 <p className="text-sm text-gray-600">Mobility Needs</p>

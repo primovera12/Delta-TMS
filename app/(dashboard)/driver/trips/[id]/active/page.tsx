@@ -16,7 +16,7 @@ import {
   ChevronRight,
   ArrowLeft,
   Car,
-  Wheelchair,
+  Accessibility,
   Activity,
   Building2,
 } from 'lucide-react';
@@ -267,7 +267,7 @@ export default function DriverActiveTripPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="flex items-center gap-1">
-              <Wheelchair className="h-3 w-3" />
+              <Accessibility className="h-3 w-3" />
               {trip.patient.mobility}
             </Badge>
             {trip.patient.specialNeeds.map((need) => (

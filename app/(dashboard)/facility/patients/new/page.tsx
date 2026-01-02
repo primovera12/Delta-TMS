@@ -10,7 +10,7 @@ import {
   MapPin,
   Calendar,
   Shield,
-  Wheelchair,
+  Accessibility,
   AlertCircle,
   UserPlus,
   Heart,
@@ -434,7 +434,7 @@ export default function FacilityAddPatientPage() {
                       onClick={() => updateField('mobilityType', type.id)}
                     >
                       <div className="flex items-center gap-3">
-                        <Wheelchair className={`h-5 w-5 ${
+                        <Accessibility className={`h-5 w-5 ${
                           formData.mobilityType === type.id ? 'text-primary-600' : 'text-gray-400'
                         }`} />
                         <div>
