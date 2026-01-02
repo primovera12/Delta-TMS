@@ -28,6 +28,14 @@ import {
   GraduationCap,
   AlertTriangle,
   Route,
+  Shield,
+  Database,
+  Flag,
+  Plug,
+  Mail,
+  Palette,
+  LifeBuoy,
+  Activity,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -240,8 +248,45 @@ const operationsNav: NavGroup[] = [
   },
 ];
 
+const superAdminNav: NavGroup[] = [
+  {
+    items: [
+      { title: 'Dashboard', href: '/super-admin', icon: LayoutDashboard },
+      { title: 'Companies', href: '/super-admin/companies', icon: Building2 },
+      { title: 'Users', href: '/super-admin/users', icon: Users },
+      { title: 'Roles', href: '/super-admin/roles', icon: Shield },
+    ],
+  },
+  {
+    title: 'Platform',
+    items: [
+      { title: 'Analytics', href: '/super-admin/analytics', icon: BarChart3 },
+      { title: 'Feature Flags', href: '/super-admin/feature-flags', icon: Flag },
+      { title: 'Integrations', href: '/super-admin/integrations', icon: Plug },
+    ],
+  },
+  {
+    title: 'Configuration',
+    items: [
+      { title: 'Config', href: '/super-admin/config', icon: Settings },
+      { title: 'Billing Config', href: '/super-admin/billing-config', icon: CreditCard },
+      { title: 'Email Templates', href: '/super-admin/email-templates', icon: Mail },
+      { title: 'Branding', href: '/super-admin/branding', icon: Palette },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { title: 'System Health', href: '/super-admin/system', icon: Activity },
+      { title: 'Audit Logs', href: '/super-admin/audit', icon: FileText },
+      { title: 'Backup', href: '/super-admin/backup', icon: Database },
+      { title: 'Support', href: '/super-admin/support', icon: LifeBuoy },
+    ],
+  },
+];
+
 interface SidebarProps {
-  portal: 'dispatcher' | 'driver' | 'admin' | 'facility' | 'patient' | 'family' | 'operations';
+  portal: 'dispatcher' | 'driver' | 'admin' | 'facility' | 'patient' | 'family' | 'operations' | 'super-admin';
   user?: {
     name: string;
     email: string;
@@ -270,13 +315,15 @@ export function Sidebar({ portal, user }: SidebarProps) {
         return familyNav;
       case 'operations':
         return operationsNav;
+      case 'super-admin':
+        return superAdminNav;
       default:
         return dispatcherNav;
     }
   }, [portal]);
 
   const portalName = React.useMemo(() => {
-    const names = {
+    const names: Record<string, string> = {
       dispatcher: 'Dispatch',
       driver: 'Driver',
       admin: 'Admin',
@@ -284,6 +331,7 @@ export function Sidebar({ portal, user }: SidebarProps) {
       patient: 'Patient',
       family: 'Family',
       operations: 'Operations',
+      'super-admin': 'Super Admin',
     };
     return names[portal];
   }, [portal]);
