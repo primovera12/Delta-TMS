@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && prisma db push && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
@@ -13,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.17.0",
     "@auth/prisma-adapter": "^2.7.0",
     "@googlemaps/js-api-loader": "^1.16.8",
     "@googlemaps/react-wrapper": "^1.1.42",
