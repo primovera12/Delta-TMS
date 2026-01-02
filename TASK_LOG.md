@@ -9,9 +9,9 @@
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| ✅ Completed | 84 | Tasks fully implemented |
+| ✅ Completed | 88 | Tasks fully implemented |
 | 🔄 In Progress | 0 | Currently being worked on |
-| 📋 Pending | 16 | Not yet started |
+| 📋 Pending | 12 | Not yet started |
 | ❌ Blocked/Error | 0 | Has issues that need resolution |
 
 ### Session Progress (January 2, 2026)
@@ -29,6 +29,10 @@
 - ✅ Built timesheet list and approval page
 - ✅ Created driver shift management system with recurring shifts
 - ✅ Added route overview page with optimization suggestions
+- ✅ Built scheduling conflict detection API and visualization page
+- ✅ Created drag-drop scheduler component and page
+- ✅ Added patient settings page with payment methods management
+- ✅ Created family member linking component with permissions management
 
 ---
 
@@ -268,7 +272,7 @@
 
 ---
 
-## Phase 6: Operations Manager - PARTIALLY COMPLETE
+## Phase 6: Operations Manager ✅ COMPLETE
 
 ### Day 62: Live Map View ✅
 - [x] Live map component (`components/domain/live-map.tsx`)
@@ -277,9 +281,9 @@
 ### Day 63-64: Schedule Calendar ✅
 - [x] Schedule page (`app/(dashboard)/dispatcher/schedule/page.tsx`)
 
-### Day 65-70: Operations Features - PARTIALLY COMPLETE
-- [ ] Conflict visualization
-- [ ] Drag-drop scheduling
+### Day 65-70: Operations Features ✅
+- [x] Conflict visualization (`app/(dashboard)/dispatcher/conflicts/page.tsx`, `app/api/v1/scheduling/conflicts/route.ts`)
+- [x] Drag-drop scheduling (`app/(dashboard)/dispatcher/scheduler/page.tsx`, `components/domain/drag-drop-scheduler.tsx`)
 - [x] Timesheet list and approval (`app/(dashboard)/admin/timesheets/page.tsx`, `app/api/v1/timesheets/route.ts`)
 - [x] Shift management (`app/(dashboard)/admin/shifts/page.tsx`, `app/api/v1/shifts/route.ts`, ScheduledShift model)
 - [x] Route overview (`app/(dashboard)/dispatcher/routes/page.tsx`)
@@ -324,10 +328,10 @@
 - [x] Family layout (`app/(dashboard)/family/layout.tsx`)
 - [x] Family trips page (`app/(dashboard)/family/trips/page.tsx`)
 
-### Day 89-90: Additional Features 📋 PENDING
-- [ ] Payment methods management UI
-- [ ] Family member linking UI
-- [ ] Patient profile editing
+### Day 89-90: Additional Features - PARTIALLY COMPLETE
+- [x] Payment methods management UI (`app/(dashboard)/patient/settings/page.tsx`, `components/domain/payment-methods.tsx`)
+- [x] Family member linking UI (`components/domain/family-member-linker.tsx`)
+- [ ] Patient profile editing (API integration)
 
 ---
 
