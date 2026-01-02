@@ -7,3 +7,7 @@ export { DocumentManager, DocumentList } from './document-manager';
 export { TripCancellationModal } from './trip-cancellation-modal';
 export { TripBookingForm } from './trip-booking-form';
 export { TripAssignmentModal } from './trip-assignment-modal';
+export { AddressAutocomplete, type AddressValue } from './address-autocomplete';
+export { AddressDisplay } from './address-display';
+export { QuickBookForm } from './quick-book-form';
+export { DriverStatusUpdate } from './driver-status-update';
