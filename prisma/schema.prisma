@@ -226,6 +226,9 @@ model User {
   updatedAt             DateTime             @updatedAt
   lastLoginAt           DateTime?
   
+  // Stripe
+  stripeCustomerId      String?
+
   // Relations
   medicalProfile        MedicalProfile?
   driverProfile         DriverProfile?
@@ -414,6 +417,7 @@ model DriverProfile {
   vehicles                    Vehicle[]
   trips                       Trip[]
   timesheets                  Timesheet[]
+  scheduledShifts             ScheduledShift[]
   availability                DriverAvailability[]
   timeOffRequests             DriverTimeOff[]
   documents                   DriverDocument[]
@@ -423,7 +427,7 @@ model DriverProfile {
   mileageLogs                 MileageLog[]
   geofenceEvents              GeofenceEvent[]
   emergencyAlerts             EmergencyAlert[]
-  
+
   @@index([status])
   @@index([licenseExpiry])
 }
@@ -586,6 +590,42 @@ model Timesheet {
   @@index([status])
 }
 
+model ScheduledShift {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+
+  // Schedule
+  date            DateTime      @db.Date
+  startTime       String        // "06:00" format for flexibility
+  endTime         String        // "14:00" format
+  shiftType       String        @default("regular") // regular, overtime, on_call
+
+  // Assignment
+  assignedBy      String?
+  assignedAt      DateTime      @default(now())
+
+  // Status
+  status          String        @default("scheduled") // scheduled, confirmed, started, completed, cancelled, no_show
+  confirmedAt     DateTime?
+
+  // Notes
+  notes           String?
+
+  // Recurrence (for repeating shifts)
+  isRecurring     Boolean       @default(false)
+  recurrenceRule  String?       // RRULE format: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+  parentShiftId   String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([driverId, date, startTime])
+  @@index([driverId])
+  @@index([date])
+  @@index([status])
+}
+
 // ============================================================
 // FACILITY
 // ============================================================
@@ -620,7 +660,17 @@ model Facility {
   billingContactName    String?
   billingContactPhone   String?
   paymentTermDays       Int                 @default(30)
-  
+
+  // Billing Address (if different from facility address)
+  billingAddressLine1   String?
+  billingCity           String?
+  billingState          String?
+  billingZipCode        String?
+  billingPhone          String?
+
+  // External IDs
+  quickbooksCustomerId  String?
+
   // Contract rates (if CONTRACT_RATE billing type)
   contractRateId        String?
   contractRate          FacilityContractRate? @relation(fields: [contractRateId], references: [id])
