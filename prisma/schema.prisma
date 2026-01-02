@@ -623,7 +623,17 @@ model Facility {
   billingContactName    String?
   billingContactPhone   String?
   paymentTermDays       Int                 @default(30)
-  
+
+  // Billing Address (if different from facility address)
+  billingAddressLine1   String?
+  billingCity           String?
+  billingState          String?
+  billingZipCode        String?
+  billingPhone          String?
+
+  // External IDs
+  quickbooksCustomerId  String?
+
   // Contract rates (if CONTRACT_RATE billing type)
   contractRateId        String?
   contractRate          FacilityContractRate? @relation(fields: [contractRateId], references: [id])
