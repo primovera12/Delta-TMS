@@ -21,7 +21,9 @@
       "Bash(cat:*)",
       "Bash(dir /b \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\admin\")",
       "Bash(if not exist \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\" mkdir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\")",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls -la \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\driver\\\\trips\\\\[id]\"\" 2>/dev/null || echo \"Directory does not exist \")",
+      "Bash(dir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\driver\\\\trips\\\\[id]\"\" 2>&1 || echo \"not found \")"
     ]
   }
 }

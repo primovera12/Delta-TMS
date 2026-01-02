@@ -122,6 +122,8 @@ const adminNav: NavGroup[] = [
     items: [
       { title: 'Complaints', href: '/admin/complaints', icon: FileText },
       { title: 'Compliance', href: '/admin/compliance', icon: FileText },
+      { title: 'Contracts', href: '/admin/contracts', icon: FileText },
+      { title: 'Audit Log', href: '/admin/audit', icon: Clock },
     ],
   },
   {
@@ -169,6 +171,7 @@ const patientNav: NavGroup[] = [
     title: 'Account',
     items: [
       { title: 'Profile', href: '/patient/profile', icon: User },
+      { title: 'Contacts', href: '/patient/contacts', icon: Users },
       { title: 'Payment', href: '/patient/payment', icon: CreditCard },
       { title: 'Settings', href: '/patient/settings', icon: Settings },
       { title: 'Help', href: '/patient/help', icon: HelpCircle },
@@ -190,6 +193,7 @@ const familyNav: NavGroup[] = [
     items: [
       { title: 'Profile', href: '/family/profile', icon: User },
       { title: 'Settings', href: '/family/settings', icon: Settings },
+      { title: 'Help', href: '/family/help', icon: HelpCircle },
     ],
   },
 ];
