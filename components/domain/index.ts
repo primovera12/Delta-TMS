@@ -15,3 +15,4 @@ export { TripStatusTimeline } from './trip-status-timeline';
 export { DriverClock } from './driver-clock';
 export { PaymentCollectionModal } from './payment-collection-modal';
 export { PaymentMethods } from './payment-methods';
+export { InvoicePaymentTracker } from './invoice-payment-tracker';
