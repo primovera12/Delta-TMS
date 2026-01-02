@@ -1,0 +1,2464 @@
+// Prisma Schema - Wheelchair Transportation Platform
+// Version: 3.0 (Updated with multi-stop, round trips, standing orders)
+// Last Updated: January 2026
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATIONS_MANAGER
+  DISPATCHER
+  DRIVER
+  FACILITY_STAFF
+  FAMILY_MEMBER
+  PATIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum TripStatus {
+  PENDING           // Just created, not yet confirmed
+  CONFIRMED         // Confirmed, awaiting driver assignment
+  ASSIGNED          // Driver assigned
+  DRIVER_EN_ROUTE   // Driver heading to first pickup
+  DRIVER_ARRIVED    // Driver at current stop
+  IN_PROGRESS       // Passenger(s) picked up, heading to destination
+  COMPLETED         // All stops completed
+  CANCELLED         // Trip cancelled
+  NO_SHOW           // Passenger not present
+}
+
+enum TripType {
+  ONE_WAY           // Single trip A → B
+  ROUND_TRIP        // A → B, then B → A (linked trips)
+  MULTI_STOP        // A → B → C → D (multiple stops)
+  WILL_CALL         // Return trip - patient calls when ready
+}
+
+enum StopType {
+  PICKUP            // Picking up passenger(s)
+  DROPOFF           // Dropping off passenger(s)
+  PICKUP_DROPOFF    // Both (e.g., drop one, pick another)
+  APPOINTMENT       // Medical appointment (wait or return later)
+}
+
+enum StopStatus {
+  PENDING           // Not yet reached
+  EN_ROUTE          // Driver heading to this stop
+  ARRIVED           // Driver at stop
+  COMPLETED         // Stop completed
+  SKIPPED           // Stop was skipped
+}
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  INVOICED
+  PAID
+}
+
+enum VehicleType {
+  SEDAN
+  WHEELCHAIR_ACCESSIBLE
+  STRETCHER_VAN
+  BARIATRIC_VEHICLE
+}
+
+enum DriverStatus {
+  OFFLINE
+  ONLINE
+  AVAILABLE         // Online and ready for trips
+  ASSIGNED          // Has upcoming trip
+  EN_ROUTE          // Heading to pickup
+  ON_TRIP           // Currently on trip
+  BREAK
+}
+
+enum CheckStatus {
+  PENDING
+  PASSED
+  FAILED
+  EXPIRED
+}
+
+enum LoyaltyTier {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+enum LoyaltyTransactionType {
+  EARNED_TRIP
+  EARNED_REFERRAL
+  EARNED_RATING
+  EARNED_BONUS
+  REDEEMED_CREDIT
+  EXPIRED
+  ADJUSTMENT
+}
+
+enum PaymentMethodType {
+  CARD
+  APPLE_PAY
+  GOOGLE_PAY
+  BANK_ACCOUNT
+}
+
+enum FacilityBillingType {
+  PAY_PER_RIDE
+  MONTHLY_INVOICE
+  CONTRACT_RATE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+  DISPUTED
+}
+
+enum NotificationChannel {
+  SMS
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  BOOKING_UPDATED
+  BOOKING_CANCELLED
+  DRIVER_ASSIGNED
+  DRIVER_EN_ROUTE
+  DRIVER_ARRIVED
+  TRIP_STARTED
+  TRIP_COMPLETED
+  REMINDER_24H
+  REMINDER_1H
+  REMINDER_30M
+  PAYMENT_RECEIVED
+  PAYMENT_FAILED
+  INVOICE_SENT
+  INVOICE_OVERDUE
+  WILL_CALL_REMINDER
+  STANDING_ORDER_CREATED
+  DOCUMENT_EXPIRING
+}
+
+enum DayOfWeek {
+  SUNDAY
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+}
+
+// ============================================================
+// USER & AUTHENTICATION
+// ============================================================
+
+model User {
+  id                    String               @id @default(uuid())
+  email                 String               @unique
+  phone                 String               @unique
+  passwordHash          String
+  firstName             String
+  lastName              String
+  dateOfBirth           DateTime?
+  role                  UserRole             @default(PATIENT)
+  status                UserStatus           @default(PENDING_VERIFICATION)
+  
+  // Verification
+  emailVerified         Boolean              @default(false)
+  phoneVerified         Boolean              @default(false)
+  
+  // Two-Factor Authentication
+  twoFactorEnabled      Boolean              @default(false)
+  twoFactorSecret       String?
+  
+  // Security
+  failedLoginAttempts   Int                  @default(0)
+  lockedUntil           DateTime?
+  passwordChangedAt     DateTime?
+  
+  // Accessibility preferences
+  elderMode             Boolean              @default(false)
+  textSize              String               @default("normal") // normal, large, extra-large
+  highContrast          Boolean              @default(false)
+  
+  // Notification preferences
+  smsNotificationsEnabled   Boolean          @default(true)
+  emailNotificationsEnabled Boolean          @default(true)
+  pushNotificationsEnabled  Boolean          @default(true)
+  reminderHoursBefore       Int              @default(24)
+  
+  // Timestamps
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  lastLoginAt           DateTime?
+  
+  // Relations
+  medicalProfile        MedicalProfile?
+  driverProfile         DriverProfile?
+  loyaltyAccount        LoyaltyAccount?
+  paymentMethods        PaymentMethod[]
+  savedAddresses        SavedAddress[]
+  
+  // Trips
+  tripsAsPassenger      TripPassenger[]
+  tripsAsBooker         Trip[]               @relation("BookerTrips")
+  
+  // Family relationships
+  patientsLinked        FamilyRelationship[] @relation("FamilyMemberRelations")
+  familyMembersLinked   FamilyRelationship[] @relation("PatientRelations")
+  
+  // Facility staff
+  facilityStaff         FacilityStaff?
+  
+  // Audit
+  statusChanges         TripStatusHistory[]
+  auditLogs             AuditLog[]
+  callLogs              CallLog[]
+  
+  // Sessions
+  sessions              Session[]
+  
+  // Dispatcher notes
+  dispatcherNotes       DispatcherShiftNote[]
+  
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([status])
+}
+
+model Session {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token         String   @unique
+  refreshToken  String?  @unique
+  
+  deviceInfo    String?
+  ipAddress     String?
+  userAgent     String?
+  
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================================
+// MEDICAL PROFILE
+// ============================================================
+
+model MedicalProfile {
+  id                           String   @id @default(uuid())
+  userId                       String   @unique
+  user                         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Mobility needs
+  mobilityAids                 String[] // ["wheelchair", "walker", "cane", "none"]
+  wheelchairType               String?  // "manual", "electric", "bariatric"
+  canTransferIndependently     Boolean  @default(true)
+  requiresLiftAssistance       Boolean  @default(false)
+  
+  // Equipment requirements
+  oxygenRequired               Boolean  @default(false)
+  oxygenFlowRate               String?  // e.g., "2L/min"
+  oxygenTankProvided           Boolean  @default(false) // Does patient bring own?
+  ivRequired                   Boolean  @default(false)
+  
+  // Physical
+  weightLbs                    Int?
+  heightInches                 Int?
+  
+  // Medical information
+  medicalConditions            String[]
+  medications                  String[]
+  allergies                    String[]
+  bloodType                    String?
+  
+  // Cognitive/Communication
+  cognitiveNotes               String?  // e.g., "dementia - may be confused"
+  hearingImpaired              Boolean  @default(false)
+  visuallyImpaired             Boolean  @default(false)
+  primaryLanguage              String   @default("English")
+  
+  // Emergency contact
+  emergencyContactName         String?
+  emergencyContactPhone        String?
+  emergencyContactRelationship String?
+  
+  // Secondary emergency contact
+  emergencyContact2Name        String?
+  emergencyContact2Phone       String?
+  emergencyContact2Relationship String?
+  
+  // Insurance (for future Medicaid/Medicare integration)
+  insuranceProvider            String?
+  insurancePolicyNumber        String?
+  insuranceGroupNumber         String?
+  medicaidNumber               String?
+  medicareNumber               String?
+  
+  // Notes
+  specialInstructions          String?
+  driverNotes                  String?  // Notes visible to driver
+  
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+// ============================================================
+// DRIVER
+// ============================================================
+
+model DriverProfile {
+  id                          String        @id @default(uuid())
+  userId                      String        @unique
+  user                        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Employee info
+  employeeId                  String?       @unique
+  hireDate                    DateTime?
+  
+  // License
+  licenseNumber               String        @unique
+  licenseState                String
+  licenseExpiry               DateTime
+  licenseClass                String?       // CDL class if applicable
+  
+  // Background & Drug Test
+  backgroundCheckStatus       CheckStatus   @default(PENDING)
+  backgroundCheckDate         DateTime?
+  backgroundCheckExpiry       DateTime?
+  backgroundCheckProvider     String?
+  drugTestStatus              CheckStatus   @default(PENDING)
+  drugTestDate                DateTime?
+  drugTestExpiry              DateTime?
+  
+  // Certifications
+  cprCertified                Boolean       @default(false)
+  cprExpiry                   DateTime?
+  firstAidCertified           Boolean       @default(false)
+  firstAidExpiry              DateTime?
+  defensiveDrivingCertified   Boolean       @default(false)
+  defensiveDrivingExpiry      DateTime?
+  passengerAssistanceCertified Boolean      @default(false)
+  passengerAssistanceExpiry   DateTime?
+  
+  // Performance
+  rating                      Float         @default(5.0)
+  totalTrips                  Int           @default(0)
+  completedTrips              Int           @default(0)
+  cancelledTrips              Int           @default(0)
+  noShowCount                 Int           @default(0)
+  totalMiles                  Float         @default(0)
+  
+  // Current status
+  status                      DriverStatus  @default(OFFLINE)
+  currentLatitude             Float?
+  currentLongitude            Float?
+  currentHeading              Float?
+  currentSpeed                Float?
+  lastLocationUpdate          DateTime?
+  
+  // Payout
+  stripeAccountId             String?
+  stripeAccountStatus         String?       // "pending", "active", "restricted"
+  
+  // Preferences
+  maxTripDistance             Int?          // Max miles willing to travel
+  preferredZones              String[]      // Preferred service areas
+  
+  createdAt                   DateTime      @default(now())
+  updatedAt                   DateTime      @updatedAt
+  
+  // Relations
+  vehicles                    Vehicle[]
+  trips                       Trip[]
+  timesheets                  Timesheet[]
+  availability                DriverAvailability[]
+  timeOffRequests             DriverTimeOff[]
+  documents                   DriverDocument[]
+  payoutAccount               DriverPayoutAccount?
+  payouts                     DriverPayout[]
+  earnings                    DriverEarning[]
+  mileageLogs                 MileageLog[]
+  geofenceEvents              GeofenceEvent[]
+  emergencyAlerts             EmergencyAlert[]
+  
+  @@index([status])
+  @@index([licenseExpiry])
+}
+
+model Vehicle {
+  id                    String        @id @default(uuid())
+  driverId              String?       // Can be unassigned
+  driver                DriverProfile? @relation(fields: [driverId], references: [id])
+  
+  // Vehicle info
+  make                  String
+  model                 String
+  year                  Int
+  color                 String
+  licensePlate          String        @unique
+  vin                   String        @unique
+  vehicleType           VehicleType
+  
+  // Capacity
+  seatingCapacity       Int
+  wheelchairCapacity    Int           @default(1)
+  stretcherCapacity     Int           @default(0)
+  maxWeightCapacity     Int?          // Max passenger weight (lbs)
+  
+  // Capabilities
+  wheelchairAccessible  Boolean       @default(true)
+  stretcherCapable      Boolean       @default(false)
+  oxygenEquipped        Boolean       @default(false)
+  hasLift               Boolean       @default(false)
+  hasRamp               Boolean       @default(false)
+  hasGPS                Boolean       @default(true)
+  hasDashcam            Boolean       @default(false)
+  
+  // Insurance & Registration
+  insuranceProvider     String
+  insurancePolicyNumber String
+  insuranceExpiry       DateTime
+  registrationState     String
+  registrationExpiry    DateTime
+  inspectionExpiry      DateTime
+  
+  // Maintenance
+  isActive              Boolean       @default(true)
+  isInService           Boolean       @default(true)
+  lastMaintenanceDate   DateTime?
+  nextMaintenanceDue    DateTime?
+  nextMaintenanceMiles  Int?
+  currentMileage        Int?
+  
+  // Notes
+  notes                 String?
+  
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  
+  // Relations
+  trips                 Trip[]
+  mileageLogs           MileageLog[]
+  
+  @@index([vehicleType])
+  @@index([isActive])
+  @@index([driverId])
+}
+
+model DriverAvailability {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  dayOfWeek       DayOfWeek
+  startTime       String        // "07:00"
+  endTime         String        // "17:00"
+  isAvailable     Boolean       @default(true)
+  
+  // Effective dates (for temporary schedule changes)
+  effectiveFrom   DateTime?
+  effectiveUntil  DateTime?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([driverId, dayOfWeek, startTime])
+  @@index([driverId])
+}
+
+model DriverTimeOff {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  startDate       DateTime      @db.Date
+  endDate         DateTime      @db.Date
+  reason          String?
+  
+  status          String        @default("pending") // pending, approved, rejected
+  approvedBy      String?
+  approvedAt      DateTime?
+  
+  createdAt       DateTime      @default(now())
+  
+  @@index([driverId])
+  @@index([startDate, endDate])
+}
+
+model DriverDocument {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  documentType    String        // "license", "insurance", "registration", "certification"
+  documentName    String
+  fileUrl         String
+  expiryDate      DateTime?
+  
+  uploadedAt      DateTime      @default(now())
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  
+  @@index([driverId])
+  @@index([expiryDate])
+}
+
+model Timesheet {
+  id              String        @id @default(uuid())
+  driverId        String
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+  
+  date            DateTime      @db.Date
+  clockInTime     DateTime
+  clockOutTime    DateTime?
+  
+  // Breaks
+  breakStartTime  DateTime?
+  breakEndTime    DateTime?
+  totalBreakMinutes Int         @default(0)
+  
+  // Calculated
+  totalMinutes    Int?
+  totalMiles      Float?
+  totalTrips      Int?
+  
+  status          String        @default("pending") // pending, approved, rejected, paid
+  approvedBy      String?
+  approvedAt      DateTime?
+  
+  notes           String?
+  dispatcherNotes String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([driverId, date])
+  @@index([driverId])
+  @@index([date])
+  @@index([status])
+}
+
+// ============================================================
+// FACILITY
+// ============================================================
+
+model Facility {
+  id                    String              @id @default(uuid())
+  name                  String
+  type                  String              // "hospital", "nursing_home", "dialysis_center", "clinic", "rehab"
+  
+  // Contact
+  phone                 String
+  email                 String?
+  fax                   String?
+  website               String?
+  
+  // Address
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  state                 String
+  zipCode               String
+  latitude              Float?
+  longitude             Float?
+  
+  // Access instructions
+  entranceInstructions  String?             // "Use emergency entrance on Oak St"
+  parkingInstructions   String?
+  
+  // Billing
+  billingType           FacilityBillingType @default(PAY_PER_RIDE)
+  billingEmail          String?
+  billingContactName    String?
+  billingContactPhone   String?
+  paymentTermDays       Int                 @default(30)
+  
+  // Contract rates (if CONTRACT_RATE billing type)
+  contractRateId        String?
+  contractRate          FacilityContractRate? @relation(fields: [contractRateId], references: [id])
+  
+  // Status
+  isActive              Boolean             @default(true)
+  
+  // Notes
+  notes                 String?
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  staff                 FacilityStaff[]
+  patients              FacilityPatient[]
+  trips                 Trip[]
+  invoices              Invoice[]
+  standingOrders        StandingOrder[]
+  bulkBookings          BulkBooking[]
+  contract              FacilityContract?
+  
+  @@index([name])
+  @@index([type])
+  @@index([isActive])
+}
+
+model FacilityContractRate {
+  id                    String    @id @default(uuid())
+  name                  String
+  
+  // Custom pricing
+  baseFareSedan         Float?
+  baseFareWheelchair    Float?
+  baseFareStretcher     Float?
+  baseFareBariatric     Float?
+  
+  perMileRate           Float?
+  perMinuteRate         Float?
+  
+  // Surcharge overrides (null = use default)
+  wheelchairSurcharge   Float?
+  stretcherSurcharge    Float?
+  oxygenSurcharge       Float?
+  
+  // Discounts
+  discountPercent       Float     @default(0)
+  
+  // Validity
+  effectiveFrom         DateTime
+  effectiveUntil        DateTime?
+  
+  isActive              Boolean   @default(true)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  facilities            Facility[]
+}
+
+model FacilityStaff {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  facilityId      String
+  facility        Facility  @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  
+  title           String?
+  department      String?
+  employeeId      String?
+  
+  // Permissions
+  canBookRides    Boolean   @default(true)
+  canCancelRides  Boolean   @default(true)
+  canViewInvoices Boolean   @default(false)
+  canManagePatients Boolean @default(true)
+  canManageStaff  Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([facilityId])
+}
+
+model FacilityPatient {
+  id                  String    @id @default(uuid())
+  facilityId          String
+  facility            Facility  @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  
+  // Can link to existing user or be standalone
+  userId              String?
+  
+  // Patient info (required if no linked user)
+  firstName           String
+  lastName            String
+  phone               String?
+  dateOfBirth         DateTime?
+  roomNumber          String?
+  medicalRecordNumber String?   // Facility's MRN
+  
+  // Medical needs
+  wheelchairRequired  Boolean   @default(false)
+  stretcherRequired   Boolean   @default(false)
+  oxygenRequired      Boolean   @default(false)
+  bariatricRequired   Boolean   @default(false)
+  
+  // Default addresses
+  defaultPickupAddressId  String?
+  defaultDropoffAddressId String?
+  
+  notes               String?
+  
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  // Relations
+  standingOrders      StandingOrder[]
+  
+  @@index([facilityId])
+  @@index([lastName, firstName])
+}
+
+// ============================================================
+// FAMILY RELATIONSHIPS
+// ============================================================
+
+model FamilyRelationship {
+  id                String   @id @default(uuid())
+  
+  patientId         String
+  patient           User     @relation("PatientRelations", fields: [patientId], references: [id], onDelete: Cascade)
+  
+  familyMemberId    String
+  familyMember      User     @relation("FamilyMemberRelations", fields: [familyMemberId], references: [id], onDelete: Cascade)
+  
+  relationshipType  String   // "spouse", "child", "parent", "sibling", "caregiver", "other"
+  
+  // Permissions
+  canBookTrips      Boolean  @default(true)
+  canCancelTrips    Boolean  @default(true)
+  canViewMedical    Boolean  @default(false)
+  canModifyProfile  Boolean  @default(false)
+  canViewLocation   Boolean  @default(true)
+  canReceiveAlerts  Boolean  @default(true)
+  
+  createdAt         DateTime @default(now())
+  
+  @@unique([patientId, familyMemberId])
+  @@index([patientId])
+  @@index([familyMemberId])
+}
+
+// ============================================================
+// ADDRESSES
+// ============================================================
+
+model SavedAddress {
+  id                    String    @id @default(uuid())
+  userId                String?
+  user                  User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Can also be a system/shared address
+  isSystemAddress       Boolean   @default(false)
+  
+  label                 String    // "Home", "Doctor's Office", "Dialysis Center"
+  
+  addressLine1          String
+  addressLine2          String?
+  city                  String
+  state                 String
+  zipCode               String
+  latitude              Float
+  longitude             Float
+  googlePlaceId         String?
+  
+  // Contact at this address
+  contactName           String?
+  contactPhone          String?
+  
+  // If this is a facility
+  facilityType          String?   // "hospital", "dialysis", "doctor", "pharmacy"
+  facilityName          String?
+  
+  // Special instructions
+  pickupInstructions    String?
+  dropoffInstructions   String?
+  accessNotes           String?   // "Use side entrance", "Ring bell twice"
+  
+  isPrimary             Boolean   @default(false)
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  
+  @@index([userId])
+}
+
+// ============================================================
+// TRIPS (WITH MULTI-STOP SUPPORT)
+// ============================================================
+
+model Trip {
+  id                      String          @id @default(uuid())
+  tripNumber              String          @unique // Format: TR-YYYYMMDD-XXXX
+  
+  // Trip type and linking
+  tripType                TripType        @default(ONE_WAY)
+  linkedTripId            String?         // For round trips - links outbound/return
+  linkedTrip              Trip?           @relation("LinkedTrips", fields: [linkedTripId], references: [id])
+  linkedTripReverse       Trip?           @relation("LinkedTrips")
+  
+  // Parent trip for recurring
+  parentTripId            String?
+  standingOrderId         String?
+  standingOrder           StandingOrder?  @relation(fields: [standingOrderId], references: [id])
+  
+  // Booking info
+  bookedById              String
+  bookedBy                User            @relation("BookerTrips", fields: [bookedById], references: [id])
+  
+  facilityId              String?
+  facility                Facility?       @relation(fields: [facilityId], references: [id])
+  
+  // Assignment
+  driverId                String?
+  driver                  DriverProfile?  @relation(fields: [driverId], references: [id])
+  vehicleId               String?
+  vehicle                 Vehicle?        @relation(fields: [vehicleId], references: [id])
+  
+  // ========== MULTI-STOP: Stops are in separate model ==========
+  // First/last stop summary for quick queries
+  firstPickupTime         DateTime        // Scheduled time for first pickup
+  lastDropoffTime         DateTime?       // Estimated time for last dropoff
+  
+  // Stop count for quick reference
+  totalStops              Int             @default(2) // Minimum 2 (pickup + dropoff)
+  
+  // For simple trips, store primary addresses here too (denormalized for performance)
+  pickupAddressLine1      String
+  pickupAddressLine2      String?
+  pickupCity              String
+  pickupState             String
+  pickupZipCode           String
+  pickupLatitude          Float
+  pickupLongitude         Float
+  
+  dropoffAddressLine1     String
+  dropoffAddressLine2     String?
+  dropoffCity             String
+  dropoffState            String
+  dropoffZipCode          String
+  dropoffLatitude         Float
+  dropoffLongitude        Float
+  
+  // ========== TIMING ==========
+  scheduledPickupTime     DateTime        // Same as firstPickupTime (for compatibility)
+  appointmentTime         DateTime?       // If booking by appointment time
+  estimatedPickupTime     DateTime?       // Calculated pickup time (for appointment bookings)
+  actualPickupTime        DateTime?
+  actualDropoffTime       DateTime?
+  
+  // Is this an ASAP request?
+  isAsap                  Boolean         @default(false)
+  
+  // Will-call return
+  isWillCall              Boolean         @default(false)
+  willCallActivatedAt     DateTime?       // When patient called for pickup
+  willCallExpiresAt       DateTime?       // When will-call expires
+  
+  // ========== DISTANCE & DURATION ==========
+  totalDistanceMiles      Float
+  estimatedDurationMinutes Int
+  actualDurationMinutes   Int?
+  
+  // ========== VEHICLE REQUIREMENTS ==========
+  vehicleType             VehicleType     @default(WHEELCHAIR_ACCESSIBLE)
+  
+  // Equipment needs (applies to ALL passengers on this trip)
+  wheelchairRequired      Boolean         @default(false)
+  stretcherRequired       Boolean         @default(false)
+  oxygenRequired          Boolean         @default(false)
+  bariatricRequired       Boolean         @default(false)
+  
+  // Service additions
+  medicalEscort           Boolean         @default(false)
+  ivSupport               Boolean         @default(false)
+  transferAssistance      Boolean         @default(false)
+  
+  // ========== PRICING ==========
+  baseFare                Float
+  distanceFare            Float
+  timeFare                Float
+  accessibilitySurcharge  Float           @default(0)
+  additionalStopsFee      Float           @default(0)  // Fee for multi-stop
+  waitTimeFee             Float           @default(0)
+  timeMultiplier          Float           @default(1.0)
+  timeMultiplierAmount    Float           @default(0)
+  
+  subtotal                Float
+  discountAmount          Float           @default(0)
+  discountReason          String?
+  totalFare               Float
+  tipAmount               Float           @default(0)
+  
+  // Price breakdown stored as JSON
+  priceBreakdown          Json?
+  
+  // ========== STATUS ==========
+  status                  TripStatus      @default(PENDING)
+  currentStopIndex        Int             @default(0)  // Which stop driver is at/heading to
+  
+  cancellationReason      String?
+  cancellationFee         Float?
+  cancelledAt             DateTime?
+  cancelledById           String?
+  
+  // ========== PAYMENT ==========
+  paymentMethodId         String?
+  paymentMethod           PaymentMethod?  @relation(fields: [paymentMethodId], references: [id])
+  paymentStatus           PaymentStatus   @default(PENDING)
+  stripePaymentIntentId   String?
+  
+  // ========== NOTES ==========
+  bookingNotes            String?         // Notes from booker
+  driverNotes             String?         // Notes for driver
+  dispatcherNotes         String?         // Internal notes
+  specialRequirements     String?
+  
+  // ========== RATINGS ==========
+  passengerRating         Int?            // 1-5
+  passengerFeedback       String?
+  driverRating            Int?            // 1-5
+  driverFeedback          String?
+  
+  // Signature capture
+  signatureUrl            String?
+  signatureName           String?
+  signatureTimestamp      DateTime?
+  
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  
+  // Relations
+  stops                   TripStop[]
+  passengers              TripPassenger[]
+  statusHistory           TripStatusHistory[]
+  notifications           NotificationLog[]
+  driverEarnings          DriverEarning[]
+  mileageLogs             MileageLog[]
+  estimateAccuracy        TripEstimateAccuracy?
+  geofenceEvents          GeofenceEvent[]
+  emergencyAlerts         EmergencyAlert[]
+  
+  @@index([tripNumber])
+  @@index([bookedById])
+  @@index([driverId])
+  @@index([facilityId])
+  @@index([status])
+  @@index([scheduledPickupTime])
+  @@index([firstPickupTime])
+  @@index([createdAt])
+  @@index([tripType])
+  @@index([isWillCall])
+}
+
+// ============================================================
+// MULTI-STOP SUPPORT
+// ============================================================
+
+model TripStop {
+  id                      String      @id @default(uuid())
+  tripId                  String
+  trip                    Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
+  // Order of stops (0, 1, 2, ...)
+  stopOrder               Int
+  
+  // Stop type
+  stopType                StopType    @default(PICKUP)
+  
+  // Address
+  addressLine1            String
+  addressLine2            String?
+  city                    String
+  state                   String
+  zipCode                 String
+  latitude                Float
+  longitude               Float
+  
+  // Contact
+  contactName             String?
+  contactPhone            String?
+  
+  // Place info
+  placeName               String?     // "Memorial Hospital", "CVS Pharmacy"
+  placeType               String?     // "hospital", "pharmacy", "residence"
+  
+  // Instructions
+  instructions            String?
+  
+  // Timing
+  scheduledTime           DateTime?   // Expected arrival time
+  estimatedArrivalTime    DateTime?   // Calculated ETA
+  actualArrivalTime       DateTime?
+  actualDepartureTime     DateTime?
+  
+  // Wait time at this stop
+  expectedWaitMinutes     Int         @default(0)  // e.g., 60 min for appointment
+  actualWaitMinutes       Int?
+  isAppointmentStop       Boolean     @default(false) // Driver waits for appointment
+  
+  // Status
+  status                  StopStatus  @default(PENDING)
+  
+  // Distance/duration from previous stop
+  distanceFromPrevious    Float?      // Miles
+  durationFromPrevious    Int?        // Minutes
+  
+  // Notes
+  notes                   String?
+  driverNotes             String?
+  
+  // Passengers getting on/off at this stop
+  passengersBoarding      TripPassenger[] @relation("BoardingStop")
+  passengersAlighting     TripPassenger[] @relation("AlightingStop")
+  
+  createdAt               DateTime    @default(now())
+  
+  @@unique([tripId, stopOrder])
+  @@index([tripId])
+}
+
+// ============================================================
+// PASSENGERS (for multi-passenger trips)
+// ============================================================
+
+model TripPassenger {
+  id                      String      @id @default(uuid())
+  tripId                  String
+  trip                    Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
+  // Passenger info
+  userId                  String?     // If registered user
+  user                    User?       @relation(fields: [userId], references: [id])
+  
+  // If not registered user
+  firstName               String
+  lastName                String
+  phone                   String?
+  
+  // Is this the primary passenger?
+  isPrimary               Boolean     @default(false)
+  
+  // Which stops they board/alight
+  boardingStopId          String?
+  boardingStop            TripStop?   @relation("BoardingStop", fields: [boardingStopId], references: [id])
+  alightingStopId         String?
+  alightingStop           TripStop?   @relation("AlightingStop", fields: [alightingStopId], references: [id])
+  
+  // Individual requirements
+  wheelchairRequired      Boolean     @default(false)
+  stretcherRequired       Boolean     @default(false)
+  oxygenRequired          Boolean     @default(false)
+  
+  // Companion info (non-patient accompanying)
+  isCompanion             Boolean     @default(false)
+  companionOf             String?     // userId of patient they're accompanying
+  
+  // Notes
+  specialNeeds            String?
+  
+  createdAt               DateTime    @default(now())
+  
+  @@index([tripId])
+  @@index([userId])
+}
+
+// ============================================================
+// STANDING ORDERS (Recurring Schedules)
+// ============================================================
+
+model StandingOrder {
+  id                      String            @id @default(uuid())
+  orderNumber             String            @unique // SO-XXXXX
+  
+  // Who this is for
+  facilityId              String?
+  facility                Facility?         @relation(fields: [facilityId], references: [id])
+  facilityPatientId       String?
+  facilityPatient         FacilityPatient?  @relation(fields: [facilityPatientId], references: [id])
+  
+  // For individual patients (non-facility)
+  patientUserId           String?
+  
+  // Created by
+  createdById             String
+  
+  // Schedule
+  frequency               String            // "daily", "weekly", "biweekly", "monthly", "custom"
+  daysOfWeek              DayOfWeek[]       // For weekly: [MONDAY, WEDNESDAY, FRIDAY]
+  dayOfMonth              Int?              // For monthly: 1-31
+  
+  // Time
+  pickupTime              String            // "08:00"
+  appointmentTime         String?           // "09:00" if booking by appointment
+  
+  // Addresses (from saved addresses or inline)
+  pickupAddressId         String?
+  pickupAddressLine1      String
+  pickupCity              String
+  pickupState             String
+  pickupZipCode           String
+  pickupLatitude          Float
+  pickupLongitude         Float
+  
+  dropoffAddressId        String?
+  dropoffAddressLine1     String
+  dropoffCity             String
+  dropoffState            String
+  dropoffZipCode          String
+  dropoffLatitude         Float
+  dropoffLongitude        Float
+  
+  // Return trip
+  includeReturn           Boolean           @default(false)
+  returnTime              String?           // "14:00" or null for will-call
+  isReturnWillCall        Boolean           @default(false)
+  
+  // Trip details (template)
+  vehicleType             VehicleType
+  wheelchairRequired      Boolean           @default(false)
+  stretcherRequired       Boolean           @default(false)
+  oxygenRequired          Boolean           @default(false)
+  
+  specialInstructions     String?
+  
+  // Preferred driver (optional)
+  preferredDriverId       String?
+  
+  // Status
+  isActive                Boolean           @default(true)
+  startDate               DateTime          @db.Date
+  endDate                 DateTime?         @db.Date
+  
+  // Auto-generation settings
+  generateDaysInAdvance   Int               @default(7) // Create trips X days ahead
+  lastGeneratedDate       DateTime?         @db.Date
+  
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  
+  // Generated trips
+  trips                   Trip[]
+  
+  @@index([facilityId])
+  @@index([isActive])
+  @@index([startDate, endDate])
+}
+
+// ============================================================
+// TRIP STATUS HISTORY
+// ============================================================
+
+model TripStatusHistory {
+  id              String      @id @default(uuid())
+  tripId          String
+  trip            Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  
+  previousStatus  TripStatus?
+  newStatus       TripStatus
+  
+  // For stop updates
+  stopId          String?
+  stopOrder       Int?
+  
+  changedById     String?
+  changedBy       User?       @relation(fields: [changedById], references: [id])
+  changedByRole   String?     // "driver", "dispatcher", "system"
+  
+  notes           String?
+  latitude        Float?      // Location when status changed
+  longitude       Float?
+  
+  createdAt       DateTime    @default(now())
+  
+  @@index([tripId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// PAYMENTS
+// ============================================================
+
+model PaymentMethod {
+  id                    String            @id @default(uuid())
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  stripePaymentMethodId String?
+  type                  PaymentMethodType
+  
+  // Card details (masked)
+  brand                 String?           // "Visa", "Mastercard"
+  lastFourDigits        String?
+  expiryMonth           Int?
+  expiryYear            Int?
+  
+  // Billing address
+  billingName           String?
+  billingAddressLine1   String?
+  billingCity           String?
+  billingState          String?
+  billingZipCode        String?
+  
+  isDefault             Boolean           @default(false)
+  nickname              String?           // "Personal Card", "Work Amex"
+  
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  
+  trips                 Trip[]
+  
+  @@index([userId])
+}
+
+// ============================================================
+// INVOICING
+// ============================================================
+
+model Invoice {
+  id                String        @id @default(uuid())
+  invoiceNumber     String        @unique // Format: INV-YYYY-XXXXX
+  
+  facilityId        String
+  facility          Facility      @relation(fields: [facilityId], references: [id])
+  
+  // Billing period
+  periodStart       DateTime      @db.Date
+  periodEnd         DateTime      @db.Date
+  
+  // Amounts
+  subtotal          Float
+  discountAmount    Float         @default(0)
+  taxRate           Float         @default(0)
+  taxAmount         Float         @default(0)
+  totalAmount       Float
+  amountPaid        Float         @default(0)
+  amountDue         Float
+  
+  // Status
+  status            InvoiceStatus @default(DRAFT)
+  dueDate           DateTime      @db.Date
+  sentAt            DateTime?
+  viewedAt          DateTime?
+  paidAt            DateTime?
+  
+  // Line items stored as JSON
+  lineItems         Json          // Array of trip summaries
+  tripCount         Int           @default(0)
+  
+  // Payment
+  stripeInvoiceId   String?
+  quickbooksInvoiceId String?
+  
+  // Payment records
+  paymentMethod     String?       // "check", "ach", "card"
+  paymentReference  String?       // Check number, transaction ID
+  
+  notes             String?
+  internalNotes     String?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  
+  // Relations
+  payments          InvoicePayment[]
+  
+  @@index([facilityId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model InvoicePayment {
+  id              String    @id @default(uuid())
+  invoiceId       String
+  invoice         Invoice   @relation(fields: [invoiceId], references: [id])
+  
+  amount          Float
+  paymentMethod   String    // "check", "ach", "card", "cash"
+  paymentReference String?
+  paymentDate     DateTime
+  
+  recordedById    String?
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([invoiceId])
+}
+
+// ============================================================
+// LOYALTY PROGRAM
+// ============================================================
+
+model LoyaltyAccount {
+  id                String               @id @default(uuid())
+  userId            String               @unique
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentPoints     Int                  @default(0)
+  lifetimePoints    Int                  @default(0)
+  tier              LoyaltyTier          @default(BRONZE)
+  
+  referralCode      String               @unique
+  referredByUserId  String?
+  referralCount     Int                  @default(0)
+  
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  
+  transactions      LoyaltyTransaction[]
+  
+  @@index([tier])
+  @@index([referralCode])
+}
+
+model LoyaltyTransaction {
+  id              String                    @id @default(uuid())
+  accountId       String
+  account         LoyaltyAccount            @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  type            LoyaltyTransactionType
+  pointsChange    Int                       // Positive for earn, negative for redeem
+  balanceAfter    Int
+  
+  description     String
+  referenceId     String?                   // Trip ID, referral user ID, etc.
+  
+  expiresAt       DateTime?                 // Points expiry
+  
+  createdAt       DateTime                  @default(now())
+  
+  @@index([accountId])
+  @@index([createdAt])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model NotificationTemplate {
+  id              String              @id @default(uuid())
+  type            NotificationType
+  channel         NotificationChannel
+  
+  name            String
+  subject         String?             // For email
+  body            String              // Template with {variables}
+  
+  isActive        Boolean             @default(true)
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  @@unique([type, channel])
+}
+
+model NotificationLog {
+  id              String              @id @default(uuid())
+  
+  tripId          String?
+  trip            Trip?               @relation(fields: [tripId], references: [id])
+  
+  userId          String?
+  recipientPhone  String?
+  recipientEmail  String?
+  
+  channel         NotificationChannel
+  type            NotificationType
+  
+  subject         String?
+  content         String
+  
+  status          String              @default("pending") // pending, sent, delivered, failed
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  failedAt        DateTime?
+  errorMessage    String?
+  
+  // External IDs
+  twilioMessageSid  String?
+  sendgridMessageId String?
+  
+  // Cost tracking
+  cost            Float?
+  
+  createdAt       DateTime            @default(now())
+  
+  @@index([tripId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([status])
+}
+
+// ============================================================
+// SERVICE CONFIGURATION
+// ============================================================
+
+model ServiceConfig {
+  id                        String    @id @default(uuid())
+  name                      String    @default("default")
+  region                    String    @default("houston")
+  
+  // Operating hours
+  serviceStartHour          Int       @default(5)   // 5 AM
+  serviceEndHour            Int       @default(23)  // 11 PM
+  
+  // Time zone
+  timezone                  String    @default("America/Chicago")
+  
+  // Booking rules
+  minLeadTimeMinutes        Int       @default(120)   // 2 hours minimum
+  asapLeadTimeMinutes       Int       @default(30)    // 30 min for ASAP
+  maxAdvanceBookingDays     Int       @default(90)    // 90 days max
+  
+  // Multi-stop settings
+  maxStopsPerTrip           Int       @default(5)
+  additionalStopFee         Float     @default(10.00)
+  
+  // Will-call settings
+  willCallExpiryHours       Int       @default(8)     // Will-call expires after X hours
+  willCallReminderMinutes   Int       @default(240)   // Remind after 4 hours
+  
+  // Service area (polygon stored as JSON array of coordinates)
+  serviceAreaPolygon        Json?
+  outOfAreaFee              Float     @default(0)
+  allowOutOfArea            Boolean   @default(false)
+  
+  // Cancellation policy
+  freeCancellationHours     Int       @default(24)
+  lateCancellationFee       Float     @default(10.00)
+  veryLateCancellationFee   Float     @default(25.00)
+  veryLateCancellationHours Int       @default(2)
+  
+  isActive                  Boolean   @default(true)
+  
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  
+  @@unique([name, region])
+  @@index([isActive])
+}
+
+model HolidayCalendar {
+  id              String    @id @default(uuid())
+  date            DateTime  @db.Date @unique
+  name            String
+  
+  // How this holiday affects service
+  isClosed        Boolean   @default(false)  // Service closed entirely
+  priceMultiplier Float     @default(1.3)    // Price increase if open
+  
+  // Modified hours (if not closed)
+  modifiedStartHour Int?
+  modifiedEndHour   Int?
+  
+  isActive        Boolean   @default(true)
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([date])
+}
+
+// ============================================================
+// PRICING CONFIGURATION
+// ============================================================
+
+model PricingConfig {
+  id              String    @id @default(uuid())
+  name            String    // "default", "houston", "dallas"
+  
+  config          Json      // Full pricing configuration object
+  
+  isActive        Boolean   @default(false)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([isActive])
+}
+
+// ============================================================
+// DISPATCHER TOOLS
+// ============================================================
+
+model CallLog {
+  id              String    @id @default(uuid())
+  
+  // Who handled the call
+  dispatcherId    String
+  dispatcher      User      @relation(fields: [dispatcherId], references: [id])
+  
+  // Caller info
+  callerPhone     String
+  callerName      String?
+  patientId       String?   // If identified
+  facilityId      String?
+  
+  // Call details
+  callType        String    // "booking", "cancellation", "inquiry", "will_call", "complaint", "other"
+  callDirection   String    @default("inbound") // "inbound", "outbound"
+  
+  duration        Int?      // Seconds
+  
+  // Outcome
+  outcome         String?   // "trip_booked", "info_provided", "transferred", "voicemail"
+  tripId          String?   // If a trip was created
+  
+  notes           String?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([dispatcherId])
+  @@index([callerPhone])
+  @@index([createdAt])
+}
+
+model DispatcherShiftNote {
+  id              String    @id @default(uuid())
+  
+  dispatcherId    String
+  dispatcher      User      @relation(fields: [dispatcherId], references: [id])
+  
+  shiftDate       DateTime  @db.Date
+  shiftType       String    // "morning", "afternoon", "evening"
+  
+  // Handoff notes for next shift
+  notes           String
+  urgentItems     String?   // High priority items
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([shiftDate])
+}
+
+// ============================================================
+// AUDIT LOG
+// ============================================================
+
+model AuditLog {
+  id              String    @id @default(uuid())
+  
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id])
+  
+  action          String    // "CREATE", "UPDATE", "DELETE", "LOGIN", "LOGOUT"
+  entityType      String    // "Trip", "User", "PricingConfig"
+  entityId        String?
+  
+  previousValue   Json?
+  newValue        Json?
+  
+  ipAddress       String?
+  userAgent       String?
+  
+  description     String?   // Human-readable description
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================
+// SYSTEM SETTINGS
+// ============================================================
+
+model SystemSettings {
+  id              String    @id @default(uuid())
+  key             String    @unique
+  value           Json
+  description     String?
+  category        String?   // "notifications", "pricing", "operations"
+  
+  updatedAt       DateTime  @updatedAt
+  updatedBy       String?
+}
+
+// ============================================================
+// BACKGROUND JOBS
+// ============================================================
+
+model ScheduledJob {
+  id              String    @id @default(uuid())
+  
+  jobType         String    // "standing_order", "reminder", "invoice", "expiry_alert"
+  referenceId     String?   // Standing order ID, trip ID, etc.
+  referenceType   String?   // Entity type for reference
+  
+  scheduledFor    DateTime
+  executedAt      DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  status          String    @default("pending") // pending, running, completed, failed, cancelled
+  attempts        Int       @default(0)
+  maxAttempts     Int       @default(3)
+  
+  payload         Json?     // Job-specific data
+  result          Json?     // Execution result
+  errorMessage    String?
+  lastError       String?
+  
+  createdAt       DateTime  @default(now())
+  
+  logs            JobLog[]
+  
+  @@index([jobType])
+  @@index([scheduledFor])
+  @@index([status])
+  @@index([status, scheduledFor])
+}
+
+model JobLog {
+  id              String    @id @default(uuid())
+  jobId           String
+  level           String    // "info", "warn", "error"
+  message         String
+  data            Json?
+  timestamp       DateTime  @default(now())
+  
+  job             ScheduledJob @relation(fields: [jobId], references: [id])
+  
+  @@index([jobId, timestamp])
+}
+
+// ============================================================
+// AUTHENTICATION - MAGIC LINKS
+// ============================================================
+
+model MagicLink {
+  id          String    @id @default(uuid())
+  token       String    @unique
+  email       String
+  userId      String?
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  
+  @@index([token])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// AUTHENTICATION - LOGIN ATTEMPTS (Security)
+// ============================================================
+
+model LoginAttempt {
+  id          String    @id @default(uuid())
+  email       String
+  ipAddress   String
+  userAgent   String?
+  success     Boolean
+  failReason  String?   // "invalid_password", "account_locked", "user_not_found"
+  createdAt   DateTime  @default(now())
+  
+  @@index([email, createdAt])
+  @@index([ipAddress, createdAt])
+}
+
+// ============================================================
+// PUSH NOTIFICATIONS
+// ============================================================
+
+enum Platform {
+  IOS
+  ANDROID
+  WEB
+}
+
+model PushSubscription {
+  id            String    @id @default(uuid())
+  userId        String
+  platform      Platform
+  token         String    // Device token or endpoint
+  endpoint      String?   // For web push
+  p256dh        String?   // For web push
+  auth          String?   // For web push
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+  
+  user          User      @relation(fields: [userId], references: [id])
+  
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+// ============================================================
+// GEOFENCING
+// ============================================================
+
+enum GeofenceType {
+  PICKUP_APPROACH
+  PICKUP_ARRIVAL
+  DROPOFF_APPROACH
+  DROPOFF_ARRIVAL
+  FACILITY_BOUNDARY
+  CUSTOM
+}
+
+model Geofence {
+  id            String        @id @default(uuid())
+  name          String
+  type          GeofenceType
+  latitude      Float
+  longitude     Float
+  radiusMeters  Int
+  polygon       Json?         // For non-circular boundaries
+  facilityId    String?
+  isActive      Boolean       @default(true)
+  
+  facility      Facility?     @relation(fields: [facilityId], references: [id])
+  events        GeofenceEvent[]
+  
+  @@index([latitude, longitude])
+  @@index([facilityId])
+}
+
+model GeofenceEvent {
+  id            String    @id @default(uuid())
+  geofenceId    String
+  tripId        String?
+  driverId      String
+  eventType     String    // "enter" | "exit" | "dwell"
+  latitude      Float
+  longitude     Float
+  timestamp     DateTime  @default(now())
+  
+  geofence      Geofence      @relation(fields: [geofenceId], references: [id])
+  trip          Trip?         @relation(fields: [tripId], references: [id])
+  driver        DriverProfile @relation(fields: [driverId], references: [id])
+  
+  @@index([tripId, timestamp])
+  @@index([driverId, timestamp])
+}
+
+// ============================================================
+// EMERGENCY ALERTS
+// ============================================================
+
+enum EmergencyType {
+  MEDICAL
+  BREAKDOWN
+  ACCIDENT
+  SAFETY
+  PATIENT_DISTRESS
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESPONDING
+  RESOLVED
+  FALSE_ALARM
+}
+
+model EmergencyAlert {
+  id              String        @id @default(uuid())
+  tripId          String?
+  driverId        String
+  type            EmergencyType
+  status          AlertStatus   @default(ACTIVE)
+  
+  // Location at time of alert
+  latitude        Float
+  longitude       Float
+  
+  // Details
+  description     String?
+  notes           String?
+  
+  // Response tracking
+  acknowledgedBy  String?
+  acknowledgedAt  DateTime?
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?
+  
+  createdAt       DateTime      @default(now())
+  
+  trip            Trip?         @relation(fields: [tripId], references: [id])
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+  
+  @@index([status, createdAt])
+  @@index([driverId])
+}
+
+// ============================================================
+// EMAIL LOGGING
+// ============================================================
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  OPENED
+  CLICKED
+  BOUNCED
+  FAILED
+}
+
+model EmailLog {
+  id              String      @id @default(uuid())
+  templateId      String
+  recipientEmail  String
+  recipientName   String?
+  userId          String?
+  tripId          String?
+  invoiceId       String?
+  
+  subject         String
+  status          EmailStatus @default(PENDING)
+  
+  // Provider details
+  providerMessageId String?
+  sentAt          DateTime?
+  deliveredAt     DateTime?
+  openedAt        DateTime?
+  clickedAt       DateTime?
+  bouncedAt       DateTime?
+  bounceReason    String?
+  
+  createdAt       DateTime    @default(now())
+  
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([templateId])
+}
+
+// ============================================================
+// QUICKBOOKS INTEGRATION
+// ============================================================
+
+enum SyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+  CONFLICT
+}
+
+model QuickBooksConfig {
+  id                  String    @id @default(uuid())
+  realmId             String    @unique // QuickBooks company ID
+  accessToken         String    // Encrypted
+  refreshToken        String    // Encrypted
+  tokenExpiresAt      DateTime
+  
+  // Mapping
+  incomeAccountId     String?
+  receivableAccountId String?
+  defaultTaxCodeId    String?
+  
+  isActive            Boolean   @default(true)
+  lastSyncAt          DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model QuickBooksSync {
+  id                String      @id @default(uuid())
+  entityType        String      // "invoice", "payment", "customer"
+  entityId          String      // Our ID
+  quickBooksId      String      // QB ID
+  lastSyncAt        DateTime
+  lastSyncStatus    SyncStatus
+  lastSyncError     String?
+  
+  @@unique([entityType, entityId])
+  @@index([lastSyncAt])
+}
+
+// ============================================================
+// VEHICLE INSPECTIONS
+// ============================================================
+
+enum InspectionType {
+  PRE_TRIP
+  POST_TRIP
+  WEEKLY_SAFETY
+  MONTHLY_MAINTENANCE
+  DOT_ANNUAL
+  STATE_SAFETY
+}
+
+enum InspectionFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum InspectionStatus {
+  IN_PROGRESS
+  PASSED
+  FAILED
+  NEEDS_REVIEW
+}
+
+model InspectionSchedule {
+  id              String              @id @default(uuid())
+  vehicleId       String
+  inspectionType  InspectionType
+  frequency       InspectionFrequency
+  lastCompleted   DateTime?
+  nextDue         DateTime
+  assignedTo      String?             // Driver or mechanic user ID
+  
+  isActive        Boolean             @default(true)
+  createdAt       DateTime            @default(now())
+  
+  vehicle         Vehicle             @relation(fields: [vehicleId], references: [id])
+  
+  @@index([nextDue])
+  @@index([vehicleId])
+}
+
+model VehicleInspection {
+  id              String            @id @default(uuid())
+  vehicleId       String
+  scheduleId      String?
+  inspectorId     String            // Driver or mechanic
+  type            InspectionType
+  
+  // Status
+  status          InspectionStatus  @default(IN_PROGRESS)
+  passedAll       Boolean?
+  
+  // Checklist results
+  checklistItems  Json              // Array of { item, passed, notes, photoUrl? }
+  
+  // Timing
+  startedAt       DateTime          @default(now())
+  completedAt     DateTime?
+  
+  // Location (for pre-trip)
+  latitude        Float?
+  longitude       Float?
+  odometerReading Int?
+  
+  notes           String?
+  signatureUrl    String?           // Driver signature
+  
+  vehicle         Vehicle           @relation(fields: [vehicleId], references: [id])
+  issues          VehicleIssue[]
+  
+  @@index([vehicleId, startedAt])
+  @@index([inspectorId])
+}
+
+// ============================================================
+// VEHICLE ISSUES
+// ============================================================
+
+enum IssueCategory {
+  ENGINE
+  BRAKES
+  TIRES
+  LIGHTS
+  WHEELCHAIR_LIFT
+  INTERIOR
+  EXTERIOR
+  SAFETY_EQUIPMENT
+  OTHER
+}
+
+enum IssueSeverity {
+  LOW       // Cosmetic, can wait
+  MEDIUM    // Should fix soon
+  HIGH      // Fix before next use
+  CRITICAL  // Vehicle out of service
+}
+
+enum IssueStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
+}
+
+model VehicleIssue {
+  id              String          @id @default(uuid())
+  vehicleId       String
+  inspectionId    String?
+  reportedBy      String
+  
+  category        IssueCategory
+  severity        IssueSeverity
+  description     String
+  photoUrls       String[]
+  
+  status          IssueStatus     @default(OPEN)
+  
+  // Resolution
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?
+  cost            Float?
+  
+  createdAt       DateTime        @default(now())
+  
+  vehicle         Vehicle         @relation(fields: [vehicleId], references: [id])
+  inspection      VehicleInspection? @relation(fields: [inspectionId], references: [id])
+  
+  @@index([vehicleId, status])
+  @@index([severity, status])
+}
+
+// ============================================================
+// VEHICLE MAINTENANCE
+// ============================================================
+
+enum MaintenanceType {
+  OIL_CHANGE
+  TIRE_ROTATION
+  BRAKE_SERVICE
+  TRANSMISSION_SERVICE
+  COOLANT_FLUSH
+  AIR_FILTER
+  FUEL_FILTER
+  SPARK_PLUGS
+  BATTERY_CHECK
+  WHEELCHAIR_LIFT_SERVICE
+  AC_SERVICE
+  GENERAL_INSPECTION
+  OTHER
+}
+
+enum MaintenanceTrigger {
+  MILEAGE
+  TIME
+  BOTH    // Whichever comes first
+}
+
+model MaintenanceSchedule {
+  id              String              @id @default(uuid())
+  vehicleId       String
+  
+  // Schedule type
+  type            MaintenanceType
+  description     String
+  
+  // Trigger
+  triggerType     MaintenanceTrigger
+  intervalMiles   Int?                // Every X miles
+  intervalDays    Int?                // Every X days
+  
+  // Current status
+  lastCompletedAt DateTime?
+  lastMileage     Int?
+  nextDueAt       DateTime?
+  nextDueMileage  Int?
+  
+  // Estimated cost
+  estimatedCost   Float?
+  estimatedDuration Int?              // Minutes
+  
+  isActive        Boolean             @default(true)
+  
+  vehicle         Vehicle             @relation(fields: [vehicleId], references: [id])
+  records         MaintenanceRecord[]
+  
+  @@index([vehicleId])
+  @@index([nextDueAt])
+}
+
+model MaintenanceRecord {
+  id              String          @id @default(uuid())
+  vehicleId       String
+  scheduleId      String?
+  
+  type            MaintenanceType
+  description     String
+  
+  // Service details
+  serviceDate     DateTime
+  mileageAtService Int
+  
+  performedBy     String?         // Mechanic/shop name
+  performedById   String?         // If internal user
+  location        String?
+  
+  // Costs
+  laborCost       Float           @default(0)
+  partsCost       Float           @default(0)
+  totalCost       Float
+  
+  // Parts used
+  partsUsed       Json?           // Array of { partName, partNumber, quantity, cost }
+  
+  // Documentation
+  notes           String?
+  invoiceUrl      String?
+  receiptUrl      String?
+  
+  createdAt       DateTime        @default(now())
+  
+  vehicle         Vehicle         @relation(fields: [vehicleId], references: [id])
+  schedule        MaintenanceSchedule? @relation(fields: [scheduleId], references: [id])
+  
+  @@index([vehicleId, serviceDate])
+}
+
+// ============================================================
+// DOCUMENT EXPIRY ALERTS
+// ============================================================
+
+model DocumentExpiryAlert {
+  id              String    @id @default(uuid())
+  documentType    String    // "vehicle_insurance", "driver_license", etc.
+  documentId      String
+  ownerId         String    // Vehicle or driver ID
+  ownerType       String    // "vehicle" or "driver"
+  
+  expiryDate      DateTime
+  alertsSent      Int       @default(0)
+  lastAlertSentAt DateTime?
+  
+  status          String    @default("pending") // pending, acknowledged, resolved
+  acknowledgedBy  String?
+  acknowledgedAt  DateTime?
+  
+  createdAt       DateTime  @default(now())
+  
+  @@index([expiryDate])
+  @@index([status])
+  @@index([ownerType, ownerId])
+}
+
+// ============================================================
+// MILEAGE TRACKING
+// ============================================================
+
+enum MileageReadingType {
+  START_OF_DAY
+  END_OF_DAY
+  TRIP_START
+  TRIP_END
+  FUEL_STOP
+  MANUAL
+}
+
+model MileageLog {
+  id              String            @id @default(uuid())
+  vehicleId       String
+  driverId        String?
+  tripId          String?
+  
+  // Reading
+  readingType     MileageReadingType
+  odometerReading Int
+  
+  // Calculated
+  milesDriven     Int?              // Delta from previous reading
+  
+  // Location
+  latitude        Float?
+  longitude       Float?
+  location        String?
+  
+  // Photo proof
+  photoUrl        String?
+  
+  notes           String?
+  recordedAt      DateTime          @default(now())
+  
+  vehicle         Vehicle           @relation(fields: [vehicleId], references: [id])
+  driver          DriverProfile?    @relation(fields: [driverId], references: [id])
+  trip            Trip?             @relation(fields: [tripId], references: [id])
+  
+  @@index([vehicleId, recordedAt])
+  @@index([driverId, recordedAt])
+}
+
+// ============================================================
+// SERVICE AREA (Enhanced)
+// ============================================================
+
+model ServiceArea {
+  id              String    @id @default(uuid())
+  name            String
+  polygon         Json      // GeoJSON polygon
+  isActive        Boolean   @default(true)
+  isPrimary       Boolean   @default(false)
+  
+  // Fee settings
+  allowOutOfArea  Boolean   @default(true)
+  maxOutOfAreaMiles Float   @default(20)
+  outOfAreaFees   Json      // Array of { maxMiles, fee }
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ============================================================
+// TRIP ESTIMATE ACCURACY
+// ============================================================
+
+model TripEstimateAccuracy {
+  id                  String    @id @default(uuid())
+  tripId              String    @unique
+  
+  // Estimated values
+  estimatedDistance   Float     // miles
+  estimatedDuration   Int       // minutes
+  estimatedFare       Float
+  estimatedPickupTime DateTime
+  
+  // Actual values
+  actualDistance      Float?
+  actualDuration      Int?
+  actualFare          Float?
+  actualPickupTime    DateTime?
+  
+  // Variances
+  distanceVariance    Float?    // percentage
+  durationVariance    Float?    // percentage
+  fareVariance        Float?    // percentage
+  pickupVariance      Int?      // minutes early/late
+  
+  // Contributing factors
+  trafficCondition    String?   // "light", "moderate", "heavy"
+  weatherCondition    String?
+  routeDeviation      Boolean?
+  notes               String?
+  
+  createdAt           DateTime  @default(now())
+  
+  trip                Trip      @relation(fields: [tripId], references: [id])
+}
+
+// ============================================================
+// BULK BOOKING (Facilities)
+// ============================================================
+
+enum BulkBookingStatus {
+  DRAFT
+  PROCESSING
+  COMPLETED
+  PARTIAL_SUCCESS
+  FAILED
+}
+
+model BulkBooking {
+  id              String            @id @default(uuid())
+  facilityId      String
+  createdBy       String
+  
+  // Shared details
+  scheduledDate   DateTime          @db.Date
+  pickupTime      String            // "08:00"
+  dropoffAddress  String
+  dropoffLat      Float
+  dropoffLng      Float
+  
+  // Status
+  status          BulkBookingStatus @default(DRAFT)
+  totalTrips      Int
+  confirmedTrips  Int               @default(0)
+  failedTrips     Int               @default(0)
+  
+  // Errors
+  errors          Json?
+  
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  
+  facility        Facility          @relation(fields: [facilityId], references: [id])
+  
+  @@index([facilityId, createdAt])
+}
+
+// ============================================================
+// FACILITY CONTRACT (Enhanced)
+// ============================================================
+
+enum ContractPricingType {
+  STANDARD      // Use standard pricing
+  DISCOUNT      // Percentage off standard
+  CUSTOM        // Custom rates
+  VOLUME        // Volume-based discounts
+  FLAT_RATE     // Flat rate per trip
+}
+
+enum BillingCycle {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+model FacilityContract {
+  id              String              @id @default(uuid())
+  facilityId      String              @unique
+  
+  // Contract terms
+  startDate       DateTime            @db.Date
+  endDate         DateTime?           @db.Date
+  autoRenew       Boolean             @default(true)
+  
+  // Pricing type
+  pricingType     ContractPricingType @default(STANDARD)
+  
+  // Custom rates (if CUSTOM)
+  baseFare        Float?
+  perMileRate     Float?
+  perMinuteRate   Float?
+  minimumFare     Float?
+  
+  // Discount (if DISCOUNT)
+  discountPercent Float?
+  
+  // Volume pricing (if VOLUME)
+  volumeTiers     Json?               // Array of { minTrips, discountPercent }
+  
+  // Flat rate (if FLAT_RATE)
+  flatRate        Float?
+  
+  // Billing
+  billingCycle    BillingCycle        @default(MONTHLY)
+  paymentTerms    Int                 @default(30)  // Net 30
+  creditLimit     Float?
+  
+  // Surcharge overrides
+  surchargeOverrides Json?            // { "wheelchair": 10.00, "oxygen": 5.00 }
+  
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  facility        Facility            @relation(fields: [facilityId], references: [id])
+}
+
+// ============================================================
+// DRIVER PAYOUTS (Stripe Connect)
+// ============================================================
+
+enum PayoutSchedule {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model DriverPayoutAccount {
+  id                    String          @id @default(uuid())
+  driverId              String          @unique
+  stripeConnectId       String          @unique
+  
+  // Onboarding status
+  onboardingComplete    Boolean         @default(false)
+  chargesEnabled        Boolean         @default(false)
+  payoutsEnabled        Boolean         @default(false)
+  
+  // Payout settings
+  payoutSchedule        PayoutSchedule  @default(WEEKLY)
+  payoutDay             Int?            // Day of week (1-7) or month (1-28)
+  minimumPayout         Float           @default(50.00)
+  
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  
+  driver                DriverProfile   @relation(fields: [driverId], references: [id])
+}
+
+model DriverPayout {
+  id                String        @id @default(uuid())
+  driverId          String
+  stripePayoutId    String?       @unique
+  
+  amount            Float
+  currency          String        @default("usd")
+  status            PayoutStatus  @default(PENDING)
+  
+  // Period covered
+  periodStart       DateTime
+  periodEnd         DateTime
+  
+  // Breakdown
+  tripEarnings      Float
+  tips              Float         @default(0)
+  bonuses           Float         @default(0)
+  deductions        Float         @default(0)
+  
+  // Timing
+  scheduledFor      DateTime
+  initiatedAt       DateTime?
+  completedAt       DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  
+  createdAt         DateTime      @default(now())
+  
+  driver            DriverProfile @relation(fields: [driverId], references: [id])
+  earnings          DriverEarning[]
+  
+  @@index([driverId, status])
+  @@index([scheduledFor])
+}
+
+enum EarningType {
+  TRIP_BASE
+  TRIP_MILEAGE
+  TRIP_TIME
+  TIP
+  BONUS
+  ADJUSTMENT
+  DEDUCTION
+}
+
+model DriverEarning {
+  id              String      @id @default(uuid())
+  driverId        String
+  tripId          String?
+  payoutId        String?
+  
+  type            EarningType
+  amount          Float
+  description     String?
+  
+  createdAt       DateTime    @default(now())
+  
+  driver          DriverProfile @relation(fields: [driverId], references: [id])
+  trip            Trip?       @relation(fields: [tripId], references: [id])
+  payout          DriverPayout? @relation(fields: [payoutId], references: [id])
+  
+  @@index([driverId, createdAt])
+  @@index([payoutId])
+}
