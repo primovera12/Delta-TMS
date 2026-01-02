@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import { Eye, EyeOff, Mail, Lock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,10 +16,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
 
+// Role-based dashboard paths
+const dashboardPaths: Record<string, string> = {
+  admin: '/admin',
+  super_admin: '/admin',
+  operations_manager: '/dispatcher',
+  dispatcher: '/dispatcher',
+  driver: '/driver',
+  facility_staff: '/facility',
+  family_member: '/family',
+  patient: '/patient',
+};
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dispatcher';
+  const callbackUrl = searchParams.get('callbackUrl');
   const error = searchParams.get('error');
 
   const [showPassword, setShowPassword] = React.useState(false);
@@ -58,7 +70,15 @@ function LoginForm() {
         return;
       }
 
-      router.push(callbackUrl);
+      // Get the session to determine the user's role
+      const session = await getSession();
+      const role = session?.user?.role?.toLowerCase() || 'patient';
+
+      // Use callbackUrl if provided (e.g., returning to a protected page),
+      // otherwise redirect to role-based dashboard
+      const redirectPath = callbackUrl || dashboardPaths[role] || '/patient';
+
+      router.push(redirectPath);
       router.refresh();
     } catch {
       setAuthError('An error occurred. Please try again.');
