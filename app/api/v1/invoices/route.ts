@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
 
 // Mock invoices data
 const invoices = [
@@ -44,6 +45,18 @@ const invoices = [
 ];
 
 export async function GET(request: NextRequest) {
+  // Authentication check
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Authorization - only allow admin, operations, and billing roles
+  const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'BILLING'];
+  if (!allowedRoles.includes(session.user.role as string)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
 
   // Filter parameters
@@ -111,6 +124,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Authentication check
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Authorization - only allow admin, operations, and billing roles
+  const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'BILLING'];
+  if (!allowedRoles.includes(session.user.role as string)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
 
