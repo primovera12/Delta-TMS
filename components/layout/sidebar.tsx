@@ -59,6 +59,7 @@ const dispatcherNav: NavGroup[] = [
     items: [
       { title: 'Patients', href: '/dispatcher/patients', icon: Users },
       { title: 'Drivers', href: '/dispatcher/drivers', icon: Truck },
+      { title: 'Assign Drivers', href: '/dispatcher/assign', icon: Truck },
       { title: 'Standing Orders', href: '/dispatcher/standing-orders', icon: Clock },
       { title: 'Routes', href: '/dispatcher/routes', icon: MapPin },
     ],
@@ -124,6 +125,7 @@ const adminNav: NavGroup[] = [
       { title: 'Compliance', href: '/admin/compliance', icon: FileText },
       { title: 'Contracts', href: '/admin/contracts', icon: FileText },
       { title: 'Audit Log', href: '/admin/audit', icon: Clock },
+      { title: 'Notifications', href: '/admin/notifications', icon: Bell },
     ],
   },
   {
