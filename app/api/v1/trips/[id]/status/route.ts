@@ -6,6 +6,7 @@ import {
   getStatusTimestampField,
   type StatusUpdateRequest,
 } from '@/lib/services/trip-status';
+import { TripNotifications, DriverNotifications } from '@/lib/services/sms';
 
 /**
  * PUT /api/v1/trips/[id]/status
@@ -128,10 +129,10 @@ export async function PUT(
       });
     }
 
-    // TODO: Trigger notifications based on status change
-    // - DRIVER_EN_ROUTE -> Notify patient "Driver on the way"
-    // - DRIVER_ARRIVED -> Notify patient "Driver arrived"
-    // - COMPLETED -> Notify patient with receipt
+    // Trigger notifications based on status change (non-blocking)
+    sendStatusNotifications(trip, newStatus as TripStatus).catch(err => {
+      console.error('Failed to send status notification:', err);
+    });
 
     return NextResponse.json({
       success: true,
@@ -232,4 +233,69 @@ function getValidTransitions(status: TripStatus): TripStatus[] {
     NO_SHOW: [],
   };
   return transitions[status] || [];
+}
+
+// Send notifications based on status change
+async function sendStatusNotifications(
+  trip: {
+    id: string;
+    scheduledPickupTime: Date;
+    pickupAddress: string;
+    dropoffAddress: string;
+    driverId: string | null;
+    driver?: {
+      user: { firstName: string; lastName: string; phone: string };
+    } | null;
+    passengers: Array<{
+      isPrimary: boolean;
+      user: { phone: string; firstName: string; lastName: string };
+    }>;
+  },
+  newStatus: TripStatus
+): Promise<void> {
+  // Get patient phone from primary passenger
+  const primaryPassenger = trip.passengers.find(p => p.isPrimary);
+  const patientPhone = primaryPassenger?.user.phone;
+
+  // Build trip data for notifications
+  const tripData = {
+    id: trip.id,
+    scheduledPickupTime: trip.scheduledPickupTime,
+    pickupAddress: trip.pickupAddress,
+    dropoffAddress: trip.dropoffAddress,
+    patient: patientPhone ? { phone: patientPhone } : null,
+    driver: trip.driver ? { user: trip.driver.user } : null,
+  };
+
+  switch (newStatus) {
+    case TripStatus.DRIVER_EN_ROUTE:
+      // Notify patient that driver is on the way
+      // TODO: Calculate actual ETA based on distance
+      await TripNotifications.sendDriverEnRoute(tripData, 15);
+      break;
+
+    case TripStatus.DRIVER_ARRIVED:
+      await TripNotifications.sendDriverArrived(tripData);
+      break;
+
+    case TripStatus.COMPLETED:
+      await TripNotifications.sendTripCompleted(tripData);
+      break;
+
+    case TripStatus.CANCELLED:
+      // Notify patient
+      await TripNotifications.sendTripCancelled({
+        ...tripData,
+        bookedByPhone: null,
+      });
+
+      // Notify driver if assigned
+      if (trip.driver?.user.phone) {
+        await DriverNotifications.sendTripCancelled(
+          trip.driver.user.phone,
+          tripData
+        );
+      }
+      break;
+  }
 }
