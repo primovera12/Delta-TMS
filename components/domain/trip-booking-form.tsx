@@ -221,7 +221,7 @@ export function TripBookingForm({
             <React.Fragment key={step.id}>
               <div className="flex flex-col items-center">
                 <div
-                  className={`h-10 w-10 rounded-full flex items-center justify-center transition-colors ${
+                  className={`h-8 w-8 sm:h-10 sm:w-10 rounded-full flex items-center justify-center transition-colors ${
                     isCompleted
                       ? 'bg-success-500 text-white'
                       : isActive
@@ -229,19 +229,20 @@ export function TripBookingForm({
                       : 'bg-gray-100 text-gray-400'
                   }`}
                 >
-                  {isCompleted ? <Check className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+                  {isCompleted ? <Check className="h-4 w-4 sm:h-5 sm:w-5" /> : <StepIcon className="h-4 w-4 sm:h-5 sm:w-5" />}
                 </div>
                 <span
-                  className={`mt-2 text-xs font-medium ${
+                  className={`mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium text-center ${
                     isActive ? 'text-primary-600' : 'text-gray-500'
                   }`}
                 >
-                  {step.name}
+                  <span className="hidden sm:inline">{step.name}</span>
+                  <span className="sm:hidden">{step.name.split(' ')[0]}</span>
                 </span>
               </div>
               {index < steps.length - 1 && (
                 <div
-                  className={`flex-1 h-px mx-2 ${
+                  className={`flex-1 h-px mx-1 sm:mx-2 ${
                     currentStep > step.id ? 'bg-success-500' : 'bg-gray-200'
                   }`}
                 />
@@ -253,7 +254,7 @@ export function TripBookingForm({
 
       {/* Step Content */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           {/* Step 1: Patient */}
           {currentStep === 1 && (
             <div className="space-y-6">

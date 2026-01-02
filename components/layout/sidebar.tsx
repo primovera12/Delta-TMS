@@ -285,12 +285,13 @@ export function Sidebar({ portal, user }: SidebarProps) {
           {/* Collapse Button */}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex w-full items-center justify-center py-3 text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex w-full items-center justify-center py-3 text-gray-500 hover:text-gray-700 transition-colors"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? (
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
             ) : (
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             )}
           </button>
 

@@ -492,6 +492,9 @@ model Vehicle {
   maintenanceRecords    MaintenanceRecord[]
   issues                VehicleIssue[]
 
+  // Bouncie GPS integration (optional)
+  bouncieDevice         BouncieDevice?
+
   @@index([vehicleType])
   @@index([isActive])
   @@index([driverId])
@@ -2520,4 +2523,220 @@ model DriverEarning {
   
   @@index([driverId, createdAt])
   @@index([payoutId])
+}
+
+// ============================================================
+// BOUNCIE GPS INTEGRATION (OPTIONAL ADD-ON)
+// ============================================================
+
+enum BounceEventType {
+  LOCATION
+  TRIP_START
+  TRIP_END
+  SPEEDING
+  HARD_BRAKE
+  RAPID_ACCEL
+  IDLE
+  DTC
+  BATTERY
+  MIL
+}
+
+enum BounceDeviceStatus {
+  ACTIVE
+  INACTIVE
+  OFFLINE
+}
+
+enum BounceConfigSyncStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  SYNCING
+}
+
+// System-wide Bouncie configuration
+model BouncieConfig {
+  id                      String    @id @default(uuid())
+
+  // API Credentials (should be encrypted in practice)
+  clientId                String?
+  clientSecret            String?
+  authorizationCode       String?
+  accessToken             String?
+  refreshToken            String?
+  tokenExpiresAt          DateTime?
+  redirectUrl             String?
+
+  // Feature toggles
+  isEnabled               Boolean   @default(false)
+  enableRealTimeTracking  Boolean   @default(true)
+  enableGeofencing        Boolean   @default(true)
+  enableDiagnostics       Boolean   @default(true)
+  enableDriverBehavior    Boolean   @default(true)
+  enableMileageTracking   Boolean   @default(true)
+  enableFuelMonitoring    Boolean   @default(false)
+  enableMaintenanceAlerts Boolean   @default(true)
+  enableAutoStatusUpdate  Boolean   @default(false)  // Auto-update trip status based on geofence
+
+  // Webhook configuration
+  webhookUrl              String?   // Auto-generated: {domain}/api/webhooks/bouncie
+  webhookSecret           String?   // For validating incoming webhooks
+  webhookEnabled          Boolean   @default(false)
+
+  // Sync settings
+  locationUpdateInterval  Int       @default(10)   // seconds
+  diagnosticsSyncInterval Int       @default(300)  // 5 minutes
+  geofenceRadiusMeters    Int       @default(100)  // Arrival detection radius
+
+  // Status
+  lastSyncAt              DateTime?
+  syncStatus              BounceConfigSyncStatus  @default(DISCONNECTED)
+  syncError               String?
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+// Bouncie device (one per vehicle)
+model BouncieDevice {
+  id                      String    @id @default(uuid())
+  imei                    String    @unique  // Bouncie device identifier
+  nickname                String?            // From Bouncie (e.g., "Van #3")
+
+  // Link to your vehicle (optional - device can exist before linking)
+  vehicleId               String?   @unique
+  vehicle                 Vehicle?  @relation(fields: [vehicleId], references: [id])
+
+  // Device status
+  status                  BounceDeviceStatus  @default(ACTIVE)
+  isOnline                Boolean   @default(false)
+  lastSeenAt              DateTime?
+
+  // Current location (updated via webhook/polling)
+  latitude                Float?
+  longitude               Float?
+  speed                   Float?    // mph
+  heading                 Float?    // degrees (0-360)
+  altitude                Float?    // feet
+  locationAccuracy        Float?    // meters
+  locationUpdatedAt       DateTime?
+
+  // Vehicle info from OBD-II
+  vin                     String?
+  make                    String?
+  model                   String?
+  year                    Int?
+
+  // Diagnostics
+  batteryVoltage          Float?    // volts
+  fuelLevelPercent        Float?    // 0-100
+  fuelRange               Float?    // estimated miles remaining
+  engineStatus            String?   // "running", "off"
+  checkEngineLight        Boolean   @default(false)
+  diagnosticCodes         String[]  // DTC codes like ["P0300", "P0420"]
+  odometerMiles           Int?
+  diagnosticsUpdatedAt    DateTime?
+
+  // Driver behavior (aggregated - reset weekly/monthly)
+  hardBrakingCount        Int       @default(0)
+  rapidAccelCount         Int       @default(0)
+  speedingCount           Int       @default(0)
+  idleTimeMinutes         Int       @default(0)
+  behaviorScore           Float?    // 0-100
+  behaviorUpdatedAt       DateTime?
+  behaviorResetAt         DateTime?
+
+  // Bouncie trip tracking
+  isOnTrip                Boolean   @default(false)
+  currentTripStartedAt    DateTime?
+
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  // Relations
+  events                  BouncieEvent[]
+  trips                   BouncieTrip[]
+
+  @@index([vehicleId])
+  @@index([isOnline])
+  @@index([status])
+}
+
+// Webhook events log
+model BouncieEvent {
+  id                      String    @id @default(uuid())
+  deviceImei              String
+  device                  BouncieDevice @relation(fields: [deviceImei], references: [imei])
+
+  // Event info
+  eventType               BounceEventType
+
+  // Location at event
+  latitude                Float?
+  longitude               Float?
+  speed                   Float?
+  heading                 Float?
+
+  // Event-specific data
+  payload                 Json      // Raw webhook payload
+
+  // Processing
+  processedAt             DateTime?
+  linkedTripId            String?   // If we linked this to a platform trip
+
+  createdAt               DateTime  @default(now())
+
+  @@index([deviceImei, eventType])
+  @@index([deviceImei, createdAt])
+  @@index([eventType, createdAt])
+  @@index([linkedTripId])
+}
+
+// Bouncie's trip records (distinct from platform trips)
+model BouncieTrip {
+  id                      String    @id @default(uuid())
+  deviceImei              String
+  device                  BouncieDevice @relation(fields: [deviceImei], references: [imei])
+  bouncieTripId           String?   @unique // Bouncie's trip ID if provided
+
+  // Trip timing
+  startedAt               DateTime
+  endedAt                 DateTime?
+  durationMinutes         Int?
+
+  // Start location
+  startLatitude           Float
+  startLongitude          Float
+  startAddress            String?
+
+  // End location
+  endLatitude             Float?
+  endLongitude            Float?
+  endAddress              String?
+
+  // Distance & fuel
+  distanceMiles           Float?
+  fuelUsedGallons         Float?
+  avgMpg                  Float?
+
+  // Behavior during trip
+  maxSpeedMph             Float?
+  avgSpeedMph             Float?
+  hardBrakes              Int       @default(0)
+  rapidAccels             Int       @default(0)
+  speedingEvents          Int       @default(0)
+  idleTimeMinutes         Int       @default(0)
+
+  // Link to platform trip (if matched)
+  platformTripId          String?
+
+  // Route (GeoJSON or array of coordinates)
+  routePolyline           String?   // Encoded polyline
+  routeGeoJson            Json?     // Full route if needed
+
+  createdAt               DateTime  @default(now())
+
+  @@index([deviceImei, startedAt])
+  @@index([platformTripId])
 }

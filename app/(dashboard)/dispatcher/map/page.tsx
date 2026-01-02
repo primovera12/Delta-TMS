@@ -1,12 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import dynamic from 'next/dynamic';
 import {
   MapPin,
   Car,
-  Navigation,
   RefreshCw,
-  Filter,
   Search,
   Phone,
   Clock,
@@ -18,7 +17,19 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LiveMap } from '@/components/domain/live-map';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Lazy load LiveMap component to reduce initial bundle size
+const LiveMap = dynamic(() => import('@/components/domain/live-map').then(mod => mod.LiveMap), {
+  ssr: false,
+  loading: () => (
+    <div className="rounded-lg border border-gray-200 bg-gray-50 animate-pulse" style={{ height: '600px' }}>
+      <div className="flex items-center justify-center h-full">
+        <Skeleton className="h-8 w-48" />
+      </div>
+    </div>
+  ),
+});
 
 // Mock data
 const drivers = [

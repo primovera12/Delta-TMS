@@ -1,9 +1,28 @@
 'use client';
 
 import React from 'react';
-import { Zap } from 'lucide-react';
-import { QuickBookForm } from '@/components/domain/quick-book-form';
+import dynamic from 'next/dynamic';
+import { Zap, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import type { AddressValue } from '@/components/domain/address-autocomplete';
+
+// Lazy load the heavy QuickBookForm component
+const QuickBookForm = dynamic(
+  () => import('@/components/domain/quick-book-form').then((mod) => mod.QuickBookForm),
+  {
+    ssr: false,
+    loading: () => (
+      <Card>
+        <CardContent className="p-8">
+          <div className="flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+            <span className="ml-3 text-gray-600">Loading booking form...</span>
+          </div>
+        </CardContent>
+      </Card>
+    ),
+  }
+);
 
 interface BookingData {
   patientFirstName: string;

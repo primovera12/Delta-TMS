@@ -153,15 +153,23 @@ export async function GET(request: NextRequest) {
     const end = start + limit;
     const paginatedDrivers = filteredDrivers.slice(start, end);
 
-    return NextResponse.json({
-      data: paginatedDrivers,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+    return NextResponse.json(
+      {
+        data: paginatedDrivers,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
       },
-    });
+      {
+        headers: {
+          // Cache for 60 seconds since driver status can change frequently
+          'Cache-Control': 'private, max-age=60, stale-while-revalidate=30',
+        },
+      }
+    );
   } catch (error) {
     console.error('Error fetching drivers:', error);
     return NextResponse.json(

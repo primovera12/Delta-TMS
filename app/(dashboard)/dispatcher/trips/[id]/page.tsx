@@ -12,7 +12,7 @@ import {
   DollarSign,
   User,
   Truck,
-  Wheelchair,
+  Accessibility,
   Wind,
   Stethoscope,
   Scale,
@@ -446,7 +446,7 @@ export default function TripDetailPage() {
                   <div className="flex flex-wrap gap-2">
                     {trip.wheelchairRequired && (
                       <Badge variant="outline" className="flex items-center gap-1">
-                        <Wheelchair className="h-3 w-3" />
+                        <Accessibility className="h-3 w-3" />
                         Wheelchair
                       </Badge>
                     )}

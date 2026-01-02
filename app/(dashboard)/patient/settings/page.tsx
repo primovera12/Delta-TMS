@@ -11,13 +11,11 @@ import {
   MapPin,
   Edit,
   Check,
-  X,
-  Plus,
   Loader2,
-  AlertCircle,
-  Wheelchair,
+  Accessibility,
   Heart,
   Users,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,93 +41,321 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PaymentMethods } from '@/components/domain/payment-methods';
 import { FamilyMemberLinker } from '@/components/domain/family-member-linker';
+import { toast } from '@/components/ui/toast';
 
-// Mock user data
-const mockUser = {
-  id: 'user-123',
-  firstName: 'John',
-  lastName: 'Doe',
-  email: 'john.doe@email.com',
-  phone: '(555) 123-4567',
-  dateOfBirth: '1955-03-15',
-  address: '123 Main Street, Houston, TX 77001',
-};
+interface UserProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  dateOfBirth: string | null;
+  address: {
+    addressLine1: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  } | null;
+}
 
-const mockMedicalProfile = {
-  mobilityStatus: 'wheelchair',
-  requiresOxygen: false,
-  requiresAttendant: true,
-  specialNeeds: 'Needs extra time for transfers',
-  allergies: 'None',
-  medications: 'Blood pressure medication',
-  emergencyContact: {
-    name: 'Jane Doe',
-    relationship: 'Spouse',
-    phone: '(555) 987-6543',
-  },
-};
+interface MedicalProfile {
+  mobilityStatus: string;
+  requiresOxygen: boolean;
+  requiresAttendant: boolean;
+  specialNeeds: string;
+  allergies: string;
+  medications: string;
+}
 
-const mockNotificationPrefs = {
-  tripReminders: true,
-  smsNotifications: true,
-  emailNotifications: true,
-  reminderHours: 24,
-};
+interface EmergencyContact {
+  name: string;
+  relationship: string;
+  phone: string;
+}
+
+interface NotificationPrefs {
+  tripReminders: boolean;
+  smsNotifications: boolean;
+  emailNotifications: boolean;
+  reminderHours: number;
+}
 
 export default function PatientSettingsPage() {
-  const [user] = React.useState(mockUser);
-  const [medicalProfile, setMedicalProfile] = React.useState(mockMedicalProfile);
-  const [notificationPrefs, setNotificationPrefs] = React.useState(mockNotificationPrefs);
-  const [isEditing, setIsEditing] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // Profile state
+  const [user, setUser] = React.useState<UserProfile | null>(null);
+  const [medicalProfile, setMedicalProfile] = React.useState<MedicalProfile | null>(null);
+  const [emergencyContact, setEmergencyContact] = React.useState<EmergencyContact | null>(null);
+  const [notificationPrefs, setNotificationPrefs] = React.useState<NotificationPrefs>({
+    tripReminders: true,
+    smsNotifications: true,
+    emailNotifications: true,
+    reminderHours: 24,
+  });
+
+  // Dialog state
   const [showEditProfileDialog, setShowEditProfileDialog] = React.useState(false);
   const [showEditMedicalDialog, setShowEditMedicalDialog] = React.useState(false);
   const [showEditEmergencyDialog, setShowEditEmergencyDialog] = React.useState(false);
 
   // Edit form state
   const [editForm, setEditForm] = React.useState({
-    phone: user.phone,
-    email: user.email,
-    address: user.address,
+    phone: '',
+    email: '',
+    address: '',
+  });
+  const [medicalForm, setMedicalForm] = React.useState<MedicalProfile>({
+    mobilityStatus: 'ambulatory',
+    requiresOxygen: false,
+    requiresAttendant: false,
+    specialNeeds: '',
+    allergies: '',
+    medications: '',
+  });
+  const [emergencyForm, setEmergencyForm] = React.useState<EmergencyContact>({
+    name: '',
+    relationship: '',
+    phone: '',
   });
 
-  const [medicalForm, setMedicalForm] = React.useState(medicalProfile);
-  const [emergencyForm, setEmergencyForm] = React.useState(medicalProfile.emergencyContact);
+  // Fetch profile data
+  React.useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await fetch('/api/v1/patients/me');
+      if (!response.ok) {
+        throw new Error('Failed to fetch profile');
+      }
+
+      const { data } = await response.json();
+
+      setUser({
+        id: data.id,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        dateOfBirth: data.dateOfBirth,
+        address: data.address,
+      });
+
+      if (data.medicalProfile) {
+        setMedicalProfile({
+          mobilityStatus: data.medicalProfile.mobilityStatus || 'ambulatory',
+          requiresOxygen: data.medicalProfile.requiresOxygen || false,
+          requiresAttendant: data.medicalProfile.requiresAttendant || false,
+          specialNeeds: data.medicalProfile.specialNeeds || '',
+          allergies: data.medicalProfile.allergies || '',
+          medications: data.medicalProfile.medications || '',
+        });
+      }
+
+      if (data.emergencyContact) {
+        setEmergencyContact(data.emergencyContact);
+      }
+
+      if (data.notificationPreferences) {
+        setNotificationPrefs(data.notificationPreferences);
+      }
+
+      // Initialize edit forms
+      setEditForm({
+        phone: data.phone || '',
+        email: data.email || '',
+        address: data.address
+          ? `${data.address.addressLine1}, ${data.address.city}, ${data.address.state} ${data.address.zipCode}`
+          : '',
+      });
+
+      if (data.medicalProfile) {
+        setMedicalForm({
+          mobilityStatus: data.medicalProfile.mobilityStatus || 'ambulatory',
+          requiresOxygen: data.medicalProfile.requiresOxygen || false,
+          requiresAttendant: data.medicalProfile.requiresAttendant || false,
+          specialNeeds: data.medicalProfile.specialNeeds || '',
+          allergies: data.medicalProfile.allergies || '',
+          medications: data.medicalProfile.medications || '',
+        });
+      }
+
+      if (data.emergencyContact) {
+        setEmergencyForm(data.emergencyContact);
+      }
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError('Failed to load profile. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    setShowEditProfileDialog(false);
+    try {
+      setIsSaving(true);
+
+      const response = await fetch('/api/v1/patients/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile: {
+            phone: editForm.phone,
+            email: editForm.email,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+
+      // Update local state
+      setUser((prev) => prev ? { ...prev, phone: editForm.phone, email: editForm.email } : null);
+      setShowEditProfileDialog(false);
+
+      toast.success('Profile updated successfully');
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      toast.error('Failed to update profile. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveMedical = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setMedicalProfile(medicalForm);
-    setIsSaving(false);
-    setShowEditMedicalDialog(false);
+    try {
+      setIsSaving(true);
+
+      const response = await fetch('/api/v1/patients/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          medicalProfile: medicalForm,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update medical profile');
+      }
+
+      setMedicalProfile(medicalForm);
+      setShowEditMedicalDialog(false);
+
+      toast.success('Medical information updated successfully');
+    } catch (err) {
+      console.error('Error updating medical profile:', err);
+      toast.error('Failed to update medical information. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveEmergency = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setMedicalProfile((prev) => ({
-      ...prev,
-      emergencyContact: emergencyForm,
-    }));
-    setIsSaving(false);
-    setShowEditEmergencyDialog(false);
+    try {
+      setIsSaving(true);
+
+      const response = await fetch('/api/v1/patients/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emergencyContact: emergencyForm,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update emergency contact');
+      }
+
+      setEmergencyContact(emergencyForm);
+      setShowEditEmergencyDialog(false);
+
+      toast.success('Emergency contact updated successfully');
+    } catch (err) {
+      console.error('Error updating emergency contact:', err);
+      toast.error('Failed to update emergency contact. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleNotificationChange = (key: keyof typeof notificationPrefs, value: boolean | number) => {
-    setNotificationPrefs((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+  const handleNotificationChange = async (key: keyof NotificationPrefs, value: boolean | number) => {
+    const newPrefs = { ...notificationPrefs, [key]: value };
+    setNotificationPrefs(newPrefs);
+
+    try {
+      const response = await fetch('/api/v1/patients/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notificationPreferences: newPrefs,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update notification preferences');
+      }
+
+      toast.success('Notification preferences saved');
+    } catch (err) {
+      console.error('Error updating notification preferences:', err);
+      // Revert on error
+      setNotificationPrefs(notificationPrefs);
+      toast.error('Failed to update preferences. Please try again.');
+    }
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-72 mt-2" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !user) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+          <p className="text-sm text-gray-500">Manage your account and preferences</p>
+        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {error || 'Unable to load profile'}
+            <Button variant="link" className="ml-2 p-0" onClick={fetchProfile}>
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  const formatAddress = () => {
+    if (!user.address) return 'No address on file';
+    return `${user.address.addressLine1}, ${user.address.city}, ${user.address.state} ${user.address.zipCode}`;
   };
 
   return (
@@ -181,7 +407,7 @@ export default function PatientSettingsPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-start gap-6">
-                <Avatar size="lg" className="h-20 w-20">
+                <Avatar className="h-20 w-20">
                   <AvatarFallback className="text-xl">
                     {user.firstName[0]}{user.lastName[0]}
                   </AvatarFallback>
@@ -194,11 +420,13 @@ export default function PatientSettingsPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-500">Date of Birth</label>
                     <p className="text-gray-900">
-                      {new Date(user.dateOfBirth).toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {user.dateOfBirth
+                        ? new Date(user.dateOfBirth).toLocaleDateString('en-US', {
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })
+                        : 'Not provided'}
                     </p>
                   </div>
                   <div className="flex items-start gap-2">
@@ -219,7 +447,7 @@ export default function PatientSettingsPage() {
                     <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
                     <div>
                       <label className="text-sm font-medium text-gray-500">Address</label>
-                      <p className="text-gray-900">{user.address}</p>
+                      <p className="text-gray-900">{formatAddress()}</p>
                     </div>
                   </div>
                 </div>
@@ -261,7 +489,7 @@ export default function PatientSettingsPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Wheelchair className="h-5 w-5" />
+                    <Accessibility className="h-5 w-5" />
                     Mobility & Medical Needs
                   </CardTitle>
                   <CardDescription>Information used to match you with appropriate transportation</CardDescription>
@@ -273,36 +501,51 @@ export default function PatientSettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Mobility Status</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="info" className="capitalize">
-                      {medicalProfile.mobilityStatus}
-                    </Badge>
+              {medicalProfile ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Mobility Status</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Badge variant="info" className="capitalize">
+                        {medicalProfile.mobilityStatus}
+                      </Badge>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Requires Attendant</label>
+                    <p className="text-gray-900">{medicalProfile.requiresAttendant ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Oxygen Required</label>
+                    <p className="text-gray-900">{medicalProfile.requiresOxygen ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Allergies</label>
+                    <p className="text-gray-900">{medicalProfile.allergies || 'None listed'}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-sm font-medium text-gray-500">Special Needs</label>
+                    <p className="text-gray-900">{medicalProfile.specialNeeds || 'None listed'}</p>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="text-sm font-medium text-gray-500">Medications</label>
+                    <p className="text-gray-900">{medicalProfile.medications || 'None listed'}</p>
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Requires Attendant</label>
-                  <p className="text-gray-900">{medicalProfile.requiresAttendant ? 'Yes' : 'No'}</p>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <Heart className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No medical information on file</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setShowEditMedicalDialog(true)}
+                  >
+                    Add Medical Info
+                  </Button>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Oxygen Required</label>
-                  <p className="text-gray-900">{medicalProfile.requiresOxygen ? 'Yes' : 'No'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Allergies</label>
-                  <p className="text-gray-900">{medicalProfile.allergies || 'None listed'}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium text-gray-500">Special Needs</label>
-                  <p className="text-gray-900">{medicalProfile.specialNeeds || 'None listed'}</p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="text-sm font-medium text-gray-500">Medications</label>
-                  <p className="text-gray-900">{medicalProfile.medications || 'None listed'}</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 
@@ -323,20 +566,35 @@ export default function PatientSettingsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Name</label>
-                  <p className="text-gray-900">{medicalProfile.emergencyContact.name}</p>
+              {emergencyContact ? (
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Name</label>
+                    <p className="text-gray-900">{emergencyContact.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Relationship</label>
+                    <p className="text-gray-900">{emergencyContact.relationship}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-500">Phone</label>
+                    <p className="text-gray-900">{emergencyContact.phone}</p>
+                  </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Relationship</label>
-                  <p className="text-gray-900">{medicalProfile.emergencyContact.relationship}</p>
+              ) : (
+                <div className="text-center py-6 text-gray-500">
+                  <Users className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                  <p>No emergency contact on file</p>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => setShowEditEmergencyDialog(true)}
+                  >
+                    Add Emergency Contact
+                  </Button>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Phone</label>
-                  <p className="text-gray-900">{medicalProfile.emergencyContact.phone}</p>
-                </div>
-              </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -599,7 +857,7 @@ export default function PatientSettingsPage() {
                 onValueChange={(v) => setEmergencyForm({ ...emergencyForm, relationship: v })}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue />
+                  <SelectValue placeholder="Select relationship" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Spouse">Spouse</SelectItem>
