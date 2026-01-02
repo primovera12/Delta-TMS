@@ -23,6 +23,11 @@ import {
   CreditCard,
   Bell,
   HelpCircle,
+  Wrench,
+  Fuel,
+  GraduationCap,
+  AlertTriangle,
+  Route,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -201,8 +206,42 @@ const familyNav: NavGroup[] = [
   },
 ];
 
+const operationsNav: NavGroup[] = [
+  {
+    items: [
+      { title: 'Dashboard', href: '/operations', icon: LayoutDashboard },
+      { title: 'Live Map', href: '/operations/map', icon: MapPin },
+      { title: 'Schedule', href: '/operations/schedule', icon: Calendar },
+      { title: 'Drivers', href: '/operations/drivers', icon: Truck },
+    ],
+  },
+  {
+    title: 'Fleet Management',
+    items: [
+      { title: 'Routes', href: '/operations/routes', icon: Route },
+      { title: 'Maintenance', href: '/operations/maintenance', icon: Wrench },
+      { title: 'Fuel', href: '/operations/fuel', icon: Fuel },
+      { title: 'Mileage', href: '/operations/mileage', icon: Car },
+    ],
+  },
+  {
+    title: 'Staff',
+    items: [
+      { title: 'Shifts', href: '/operations/shifts', icon: Clock },
+      { title: 'Timesheets', href: '/operations/timesheets', icon: Clock },
+      { title: 'Training', href: '/operations/training', icon: GraduationCap },
+    ],
+  },
+  {
+    title: 'Safety',
+    items: [
+      { title: 'Incidents', href: '/operations/incidents', icon: AlertTriangle },
+    ],
+  },
+];
+
 interface SidebarProps {
-  portal: 'dispatcher' | 'driver' | 'admin' | 'facility' | 'patient' | 'family';
+  portal: 'dispatcher' | 'driver' | 'admin' | 'facility' | 'patient' | 'family' | 'operations';
   user?: {
     name: string;
     email: string;
@@ -229,6 +268,8 @@ export function Sidebar({ portal, user }: SidebarProps) {
         return patientNav;
       case 'family':
         return familyNav;
+      case 'operations':
+        return operationsNav;
       default:
         return dispatcherNav;
     }
@@ -242,6 +283,7 @@ export function Sidebar({ portal, user }: SidebarProps) {
       facility: 'Facility',
       patient: 'Patient',
       family: 'Family',
+      operations: 'Operations',
     };
     return names[portal];
   }, [portal]);
