@@ -79,8 +79,9 @@ export function Topbar({
           size="icon"
           className="lg:hidden"
           onClick={onMenuClick}
+          aria-label="Open navigation menu"
         >
-          <Menu className="h-5 w-5" />
+          <Menu className="h-5 w-5" aria-hidden="true" />
         </Button>
 
         {/* Title */}
@@ -95,10 +96,11 @@ export function Topbar({
         {showSearch && (
           <div className="hidden md:block">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" aria-hidden="true" />
               <Input
                 placeholder="Search trips, patients, drivers..."
                 className="w-48 pl-9 md:w-64 lg:w-80"
+                aria-label="Search trips, patients, drivers"
               />
             </div>
           </div>
@@ -117,16 +119,22 @@ export function Topbar({
             size="icon"
             className="md:hidden h-11 w-11"
             onClick={() => setSearchOpen(true)}
+            aria-label="Open search"
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-5 w-5" aria-hidden="true" />
           </Button>
         )}
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative h-11 w-11">
-              <Bell className="h-5 w-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative h-11 w-11"
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+            >
+              <Bell className="h-5 w-5" aria-hidden="true" />
               {unreadCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-error-500 text-[10px] font-medium text-white">
                   {unreadCount > 9 ? '9+' : unreadCount}
@@ -184,8 +192,8 @@ export function Topbar({
         </DropdownMenu>
 
         {/* Help */}
-        <Button variant="ghost" size="icon" className="hidden lg:flex">
-          <HelpCircle className="h-5 w-5" />
+        <Button variant="ghost" size="icon" className="hidden lg:flex" aria-label="Help">
+          <HelpCircle className="h-5 w-5" aria-hidden="true" />
         </Button>
 
         {/* User menu */}
@@ -195,6 +203,7 @@ export function Topbar({
               <Button
                 variant="ghost"
                 className="flex items-center gap-2 px-2 hover:bg-gray-100"
+                aria-label={`User menu for ${user.name}`}
               >
                 <Avatar size="sm">
                   {user.avatar ? (
@@ -208,7 +217,7 @@ export function Topbar({
                 <span className="hidden lg:block text-sm font-medium text-gray-700">
                   {user.name.split(' ')[0]}
                 </span>
-                <ChevronDown className="hidden lg:block h-4 w-4 text-gray-400" />
+                <ChevronDown className="hidden lg:block h-4 w-4 text-gray-500" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-56 max-w-xs">
@@ -243,18 +252,25 @@ export function Topbar({
 
       {/* Mobile search overlay */}
       {searchOpen && (
-        <div className="fixed inset-0 z-50 bg-white p-4 md:hidden">
+        <div className="fixed inset-0 z-50 bg-white p-4 md:hidden" role="dialog" aria-label="Search">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" aria-hidden="true" />
               <Input
                 placeholder="Search..."
                 className="w-full pl-9"
                 autoFocus
+                aria-label="Search"
               />
             </div>
-            <Button variant="ghost" size="icon" className="h-11 w-11" onClick={() => setSearchOpen(false)}>
-              <X className="h-5 w-5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              onClick={() => setSearchOpen(false)}
+              aria-label="Close search"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
             </Button>
           </div>
         </div>

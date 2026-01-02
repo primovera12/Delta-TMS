@@ -9,9 +9,9 @@
 
 | Status | Count | Description |
 |--------|-------|-------------|
-| ✅ Completed | 94 | Tasks fully implemented |
+| ✅ Completed | 95 | Tasks fully implemented |
 | 🔄 In Progress | 0 | Currently being worked on |
-| 📋 Pending | 6 | Not yet started |
+| 📋 Pending | 5 | Not yet started |
 | ❌ Blocked/Error | 0 | Has issues that need resolution |
 
 ### Session Progress (January 2, 2026 - Session 2)
@@ -35,6 +35,12 @@
   - Larger touch targets for buttons (44px+)
   - Responsive step indicators on booking form
   - Responsive search input widths
+- ✅ Accessibility (WCAG 2.1 AA) fixes:
+  - Added aria-labels to all icon buttons (topbar, sidebar)
+  - Added skip link for keyboard navigation
+  - Improved color contrast (gray-400 to gray-500)
+  - Added aria-hidden to decorative icons
+  - Fixed input aria-labels for screen readers
 
 ### Session Progress (January 2, 2026 - Session 1)
 - ✅ Created TASK_LOG.md for progress tracking
@@ -364,7 +370,7 @@
 - [x] Error handling polish (global error page, dashboard error boundary, API error utilities)
 - [x] Loading states everywhere (dashboard loading skeleton, reusable loading components)
 - [x] Mobile responsiveness audit (responsive dropdowns, touch targets, form steps)
-- [ ] Accessibility audit (WCAG 2.1 AA)
+- [x] Accessibility audit (WCAG 2.1 AA - aria-labels, skip links, color contrast fixes)
 - [ ] Security review
 
 ### Day 97-100: Launch Prep 📋

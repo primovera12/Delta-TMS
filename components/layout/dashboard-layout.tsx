@@ -47,6 +47,14 @@ export function DashboardLayout({
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gray-50">
+        {/* Skip link for keyboard navigation */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-br-lg focus:outline-none"
+        >
+          Skip to main content
+        </a>
+
         {/* Sidebar - Desktop */}
         <div className="hidden lg:block">
           <Sidebar portal={portal} user={user} />
@@ -86,10 +94,12 @@ export function DashboardLayout({
 
           {/* Page content */}
           <main
+            id="main-content"
             className={cn(
               'flex-1 p-4 lg:p-6',
               !fullWidth && 'mx-auto w-full max-w-7xl'
             )}
+            tabIndex={-1}
           >
             {children}
           </main>
