@@ -7,11 +7,32 @@ import Stripe from 'stripe';
 import { prisma } from '@/lib/db';
 import { PaymentStatus, PaymentMethodType } from '@prisma/client';
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2024-12-18.acacia',
-  typescript: true,
-});
+// Lazy initialization of Stripe client
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  if (!stripeInstance) {
+    const apiKey = process.env.STRIPE_SECRET_KEY;
+    if (!apiKey) {
+      throw new Error('STRIPE_SECRET_KEY environment variable is not set');
+    }
+    stripeInstance = new Stripe(apiKey, {
+      apiVersion: '2024-12-18.acacia',
+      typescript: true,
+    });
+  }
+  return stripeInstance;
+}
+
+// For backwards compatibility
+const stripe = {
+  get customers() { return getStripe().customers; },
+  get paymentIntents() { return getStripe().paymentIntents; },
+  get paymentMethods() { return getStripe().paymentMethods; },
+  get setupIntents() { return getStripe().setupIntents; },
+  get refunds() { return getStripe().refunds; },
+  get webhooks() { return getStripe().webhooks; },
+};
 
 export interface CreatePaymentIntentParams {
   amount: number; // in cents
@@ -606,5 +627,5 @@ export async function handleWebhookEvent(event: Stripe.Event): Promise<void> {
   }
 }
 
-// Export stripe instance for advanced usage
-export { stripe };
+// Export stripe getter for advanced usage
+export { getStripe as stripe };

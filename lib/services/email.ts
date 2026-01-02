@@ -105,7 +105,7 @@ const EMAIL_TEMPLATES = {
         </tr>
         <tr style="border-top: 2px solid #e2e8f0;">
           <td style="padding: 16px 0 8px 0; font-size: 18px; font-weight: bold;">Amount Due:</td>
-          <td style="padding: 16px 0 8px 0; text-align: right; font-size: 24px; font-weight: bold; color: #1e293b;">${totalAmount}</td>
+          <td style="padding: 16px 0 8px 0; text-align: right; font-size: 24px; font-weight: bold; color: #1e293b;">$ {totalAmount}</td>
         </tr>
       </table>
     </div>
@@ -143,7 +143,7 @@ const EMAIL_TEMPLATES = {
   <div style="background: #fef2f2; padding: 20px; border: 1px solid #fecaca; border-top: none;">
     <p>Dear {recipientName},</p>
 
-    <p>This is a friendly reminder that invoice <strong>#{invoiceNumber}</strong> for <strong>${totalAmount}</strong> is due on <strong>{dueDate}</strong>.</p>
+    <p>This is a friendly reminder that invoice <strong>#{invoiceNumber}</strong> for <strong>$ {totalAmount}</strong> is due on <strong>{dueDate}</strong>.</p>
 
     <div style="text-align: center; margin: 30px 0;">
       <a href="{invoiceUrl}" style="display: inline-block; background: #dc2626; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold;">Pay Now</a>
@@ -177,7 +177,7 @@ const EMAIL_TEMPLATES = {
   <div style="background: #fef2f2; padding: 20px; border: 2px solid #dc2626; border-top: none;">
     <p>Dear {recipientName},</p>
 
-    <p><strong>Your invoice #{invoiceNumber} for ${totalAmount} is now overdue.</strong></p>
+    <p><strong>Your invoice #{invoiceNumber} for $ {totalAmount} is now overdue.</strong></p>
 
     <p>The payment was due on {dueDate}. Please make payment immediately to avoid any service interruptions.</p>
 
@@ -213,7 +213,7 @@ const EMAIL_TEMPLATES = {
   <div style="background: #f0fdf4; padding: 20px; border: 1px solid #bbf7d0; border-top: none;">
     <p>Dear {recipientName},</p>
 
-    <p>Thank you! We have received your payment of <strong>${paymentAmount}</strong> for invoice <strong>#{invoiceNumber}</strong>.</p>
+    <p>Thank you! We have received your payment of <strong>$ {paymentAmount}</strong> for invoice <strong>#{invoiceNumber}</strong>.</p>
 
     <div style="background: white; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin: 20px 0;">
       <table style="width: 100%; border-collapse: collapse;">
@@ -223,7 +223,7 @@ const EMAIL_TEMPLATES = {
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #64748b;">Payment Amount:</td>
-          <td style="padding: 8px 0; text-align: right; font-weight: bold;">${paymentAmount}</td>
+          <td style="padding: 8px 0; text-align: right; font-weight: bold;">$ {paymentAmount}</td>
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #64748b;">Payment Date:</td>
@@ -231,7 +231,7 @@ const EMAIL_TEMPLATES = {
         </tr>
         <tr>
           <td style="padding: 8px 0; color: #64748b;">Remaining Balance:</td>
-          <td style="padding: 8px 0; text-align: right;">${remainingBalance}</td>
+          <td style="padding: 8px 0; text-align: right;">$ {remainingBalance}</td>
         </tr>
       </table>
     </div>
