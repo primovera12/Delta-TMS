@@ -80,11 +80,13 @@ const driverNav: NavGroup[] = [
       { title: 'My Trips', href: '/driver/trips', icon: Car },
       { title: 'Schedule', href: '/driver/schedule', icon: Calendar },
       { title: 'Inspection', href: '/driver/inspection', icon: FileText },
+      { title: 'Notifications', href: '/driver/notifications', icon: Bell },
     ],
   },
   {
     title: 'Account',
     items: [
+      { title: 'Availability', href: '/driver/availability', icon: Calendar },
       { title: 'Timesheet', href: '/driver/timesheet', icon: Clock },
       { title: 'Earnings', href: '/driver/earnings', icon: CreditCard },
       { title: 'Documents', href: '/driver/documents', icon: FileText },
@@ -132,11 +134,13 @@ const facilityNav: NavGroup[] = [
       { title: 'Book Trip', href: '/facility/trips/new', icon: Car },
       { title: 'Patients', href: '/facility/patients', icon: Users },
       { title: 'Trips', href: '/facility/trips', icon: Calendar },
+      { title: 'Standing Orders', href: '/facility/standing-orders', icon: Clock },
     ],
   },
   {
-    title: 'Billing',
+    title: 'Management',
     items: [
+      { title: 'Reports', href: '/facility/reports', icon: BarChart3 },
       { title: 'Invoices', href: '/facility/invoices', icon: FileText },
       { title: 'Users', href: '/facility/users', icon: Users },
     ],

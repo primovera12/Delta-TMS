@@ -20,7 +20,8 @@
       "Bash(git commit:*)",
       "Bash(cat:*)",
       "Bash(dir /b \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\admin\")",
-      "Bash(if not exist \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\" mkdir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\")"
+      "Bash(if not exist \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\" mkdir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\dispatcher\\\\conflicts\")",
+      "Bash(find:*)"
     ]
   }
 }
