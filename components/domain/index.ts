@@ -11,3 +11,5 @@ export { AddressAutocomplete, type AddressValue } from './address-autocomplete';
 export { AddressDisplay } from './address-display';
 export { QuickBookForm } from './quick-book-form';
 export { DriverStatusUpdate } from './driver-status-update';
+export { TripStatusTimeline } from './trip-status-timeline';
+export { DriverClock } from './driver-clock';
