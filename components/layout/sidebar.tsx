@@ -69,6 +69,8 @@ const dispatcherNav: NavGroup[] = [
       { title: 'Scheduler', href: '/dispatcher/scheduler', icon: Calendar },
       { title: 'Conflicts', href: '/dispatcher/conflicts', icon: Clock },
       { title: 'Will Call', href: '/dispatcher/will-call', icon: Car },
+      { title: 'Batch Ops', href: '/dispatcher/batch', icon: FileText },
+      { title: 'Price Quote', href: '/dispatcher/quote', icon: CreditCard },
     ],
   },
 ];
@@ -113,6 +115,13 @@ const adminNav: NavGroup[] = [
       { title: 'Billing', href: '/admin/billing', icon: CreditCard },
       { title: 'Pricing', href: '/admin/pricing', icon: CreditCard },
       { title: 'Timesheets', href: '/admin/timesheets', icon: Clock },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      { title: 'Complaints', href: '/admin/complaints', icon: FileText },
+      { title: 'Compliance', href: '/admin/compliance', icon: FileText },
     ],
   },
   {
@@ -162,6 +171,7 @@ const patientNav: NavGroup[] = [
       { title: 'Profile', href: '/patient/profile', icon: User },
       { title: 'Payment', href: '/patient/payment', icon: CreditCard },
       { title: 'Settings', href: '/patient/settings', icon: Settings },
+      { title: 'Help', href: '/patient/help', icon: HelpCircle },
     ],
   },
 ];
