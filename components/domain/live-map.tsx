@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { MapPin, Navigation, Car, RefreshCw, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { MapPin, Navigation, Car, RefreshCw, ZoomIn, ZoomOut, Maximize2, Satellite, Smartphone } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,8 @@ interface Driver {
   status: 'available' | 'on-trip' | 'offline';
   location: Location;
   currentTripId?: string;
+  locationSource?: 'bouncie' | 'driver_phone' | 'last_known';
+  isStale?: boolean;
 }
 
 interface Trip {
@@ -136,8 +138,17 @@ export function LiveMap({
                 )}
               </div>
               <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-1 whitespace-nowrap">
-                <span className="text-xs font-medium text-gray-700 bg-white px-2 py-0.5 rounded shadow-sm">
+                <span className="text-xs font-medium text-gray-700 bg-white px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                  {driver.locationSource === 'bouncie' && (
+                    <Satellite className="h-3 w-3 text-blue-500" aria-label="GPS location" />
+                  )}
+                  {driver.locationSource === 'driver_phone' && (
+                    <Smartphone className="h-3 w-3 text-green-500" aria-label="Phone location" />
+                  )}
                   {driver.name.split(' ')[0]}
+                  {driver.isStale && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" title="Stale location" />
+                  )}
                 </span>
               </div>
             </div>
@@ -220,6 +231,17 @@ export function LiveMap({
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gray-400" />
                 <span className="text-xs text-gray-600">Offline</span>
+              </div>
+              <div className="border-t pt-1.5 mt-1.5">
+                <p className="text-xs font-medium text-gray-600 mb-1">Location Source</p>
+                <div className="flex items-center gap-2">
+                  <Satellite className="h-3 w-3 text-blue-500" />
+                  <span className="text-xs text-gray-600">GPS (Bouncie)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-3 w-3 text-green-500" />
+                  <span className="text-xs text-gray-600">Phone</span>
+                </div>
               </div>
             </div>
           </div>
