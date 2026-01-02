@@ -9,7 +9,7 @@ import {
   Clock,
   User,
   Phone,
-  Wheelchair,
+  Accessibility,
   Stethoscope,
   Wind,
   Scale,
@@ -65,7 +65,7 @@ interface QuickBookFormProps {
 }
 
 const vehicleTypes = [
-  { value: 'WHEELCHAIR_ACCESSIBLE', label: 'Wheelchair', icon: Wheelchair },
+  { value: 'WHEELCHAIR_ACCESSIBLE', label: 'Wheelchair', icon: Accessibility },
   { value: 'STRETCHER_VAN', label: 'Stretcher', icon: Ambulance },
   { value: 'BARIATRIC_VEHICLE', label: 'Bariatric', icon: Scale },
   { value: 'SEDAN', label: 'Sedan', icon: CarFront },
@@ -401,7 +401,7 @@ export function QuickBookForm({ onSubmit, onBookAndAssign }: QuickBookFormProps)
                     checked={watchedValues.wheelchairRequired}
                     onCheckedChange={(checked) => setValue('wheelchairRequired', !!checked)}
                   />
-                  <Wheelchair className="h-4 w-4 text-gray-500" />
+                  <Accessibility className="h-4 w-4 text-gray-500" />
                   <span className="text-sm">Wheelchair</span>
                 </label>
 

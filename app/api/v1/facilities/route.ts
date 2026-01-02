@@ -167,17 +167,25 @@ export async function GET(request: NextRequest) {
     },
   };
 
-  return NextResponse.json({
-    success: true,
-    data: paginatedFacilities,
-    summary,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
+  return NextResponse.json(
+    {
+      success: true,
+      data: paginatedFacilities,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
     },
-  });
+    {
+      headers: {
+        // Cache for 5 minutes since facilities rarely change
+        'Cache-Control': 'private, max-age=300, stale-while-revalidate=60',
+      },
+    }
+  );
 }
 
 export async function POST(request: NextRequest) {

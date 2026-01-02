@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Card } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -12,7 +13,7 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({
+function StatCardBase({
   title,
   value,
   change,
@@ -21,17 +22,17 @@ export function StatCard({
   trend,
   className,
 }: StatCardProps) {
-  const getTrendIcon = () => {
+  const trendIcon = useMemo(() => {
     if (trend === 'up') return <TrendingUp className="h-4 w-4" />;
     if (trend === 'down') return <TrendingDown className="h-4 w-4" />;
     return <Minus className="h-4 w-4" />;
-  };
+  }, [trend]);
 
-  const getTrendColor = () => {
+  const trendColor = useMemo(() => {
     if (trend === 'up') return 'text-success-600';
     if (trend === 'down') return 'text-error-600';
     return 'text-gray-500';
-  };
+  }, [trend]);
 
   return (
     <Card className={cn('p-6', className)}>
@@ -40,10 +41,10 @@ export function StatCard({
           <p className="text-sm font-medium text-gray-500">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
           {(change !== undefined || changeLabel) && (
-            <div className={cn('flex items-center gap-1 text-sm', getTrendColor())}>
+            <div className={cn('flex items-center gap-1 text-sm', trendColor)}>
               {change !== undefined && (
                 <>
-                  {getTrendIcon()}
+                  {trendIcon}
                   <span className="font-medium">
                     {change > 0 ? '+' : ''}
                     {change}%
@@ -65,3 +66,5 @@ export function StatCard({
     </Card>
   );
 }
+
+export const StatCard = memo(StatCardBase);
