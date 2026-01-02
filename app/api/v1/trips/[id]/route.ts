@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 
 // Mock trip data
-const trips: Record<string, any> = {
+const trips: Record<string, unknown> = {
   'TR-20260115-001': {
     id: 'TR-20260115-001',
     patientId: 'PAT-001',

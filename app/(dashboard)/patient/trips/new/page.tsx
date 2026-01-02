@@ -11,7 +11,7 @@ import {
   CheckCircle,
   AlertCircle,
   Car,
-  Wheelchair,
+  Accessibility,
   Phone,
   User,
   FileText,
@@ -64,7 +64,7 @@ const savedDestinations = [
 ];
 
 const vehicleTypes = [
-  { value: 'wheelchair', label: 'Wheelchair Van', icon: Wheelchair },
+  { value: 'wheelchair', label: 'Wheelchair Van', icon: Accessibility },
   { value: 'ambulatory', label: 'Ambulatory (Sedan)', icon: Car },
   { value: 'stretcher', label: 'Stretcher Van', icon: Car },
 ];

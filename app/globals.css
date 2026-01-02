@@ -95,7 +95,7 @@
 
   /* Base styles */
   * {
-    @apply border-border-DEFAULT;
+    @apply border-gray-200;
   }
 
   html {
