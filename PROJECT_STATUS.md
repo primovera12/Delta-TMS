@@ -103,8 +103,24 @@
 - [x] Updated Stripe API version
 - [x] Fixed trip-status enum handling
 
+### API Routes Converted from Mock Data to Prisma (CRITICAL FIX)
+- [x] **trips/route.ts** - GET (list), POST (create)
+- [x] **trips/[id]/route.ts** - GET, PATCH, DELETE
+- [x] **vehicles/route.ts** - GET (list), POST (create), PATCH (bulk update)
+- [x] **facilities/route.ts** - GET (list with stats), POST (create)
+- [x] **invoices/route.ts** - GET (list with summary), POST (create with trip calc)
+
+### Still Need Conversion (Mock Data)
+- [ ] standing-orders/route.ts
+- [ ] standing-orders/[id]/route.ts
+- [ ] payments/route.ts
+- [ ] notifications/route.ts
+- [ ] facilities/[id]/route.ts
+- [ ] invoices/[id]/route.ts
+- [ ] drivers/[id]/documents/route.ts
+
 ### Known Issues
-- [ ] ~50 TypeScript errors in API routes (Prisma schema mismatches) - Non-blocking
+- [ ] ~50 TypeScript errors in service files (Prisma schema mismatches) - Non-blocking
 - [ ] ~100 ESLint warnings (unused imports) - Non-blocking
 
 ---
