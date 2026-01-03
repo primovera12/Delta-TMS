@@ -25,9 +25,5 @@ declare module 'next-auth' {
   }
 }
 
-declare module '@auth/core/jwt' {
-  interface JWT {
-    id: string;
-    role: string;
-  }
-}
+// JWT type extension - using inline types instead of module augmentation
+// since next-auth/jwt module resolution varies between versions

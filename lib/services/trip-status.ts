@@ -144,12 +144,13 @@ export function getStatusTimestampField(status: TripStatus): string | null {
  * Determine if status update requires location
  */
 export function requiresLocation(status: TripStatus): boolean {
-  return [
+  const locationRequiredStatuses: TripStatus[] = [
     TripStatus.DRIVER_EN_ROUTE,
     TripStatus.DRIVER_ARRIVED,
     TripStatus.IN_PROGRESS,
     TripStatus.COMPLETED,
-  ].includes(status);
+  ];
+  return locationRequiredStatuses.includes(status);
 }
 
 /**

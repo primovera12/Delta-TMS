@@ -39,8 +39,8 @@ const cancellationReasons = [
   { value: 'other', label: 'Other' },
 ];
 
-const cancellationPolicies = {
-  free: { label: 'Free cancellation', description: 'More than 2 hours before pickup' },
+const cancellationPolicies: Record<string, { label: string; description: string; fee?: number }> = {
+  free: { label: 'Free cancellation', description: 'More than 2 hours before pickup', fee: 0 },
   late: { label: 'Late cancellation', description: 'Less than 2 hours before pickup', fee: 25 },
   noShow: { label: 'No-show', description: 'After pickup time', fee: 50 },
 };
