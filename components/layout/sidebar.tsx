@@ -167,6 +167,19 @@ const adminNav: NavGroup[] = [
       { title: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     ],
   },
+  {
+    title: 'All Portals',
+    items: [
+      { title: 'Dispatcher', href: '/dispatcher', icon: Car },
+      { title: 'Live Map', href: '/dispatcher/map', icon: MapPin },
+      { title: 'Operations', href: '/operations', icon: Wrench },
+      { title: 'Super Admin', href: '/super-admin', icon: Shield },
+      { title: 'Driver View', href: '/driver', icon: Truck },
+      { title: 'Facility View', href: '/facility', icon: Building2 },
+      { title: 'Patient View', href: '/patient', icon: User },
+      { title: 'Family View', href: '/family', icon: Users },
+    ],
+  },
 ];
 
 const facilityNav: NavGroup[] = [
