@@ -68,6 +68,8 @@ export default function PatientBookRidePage() {
   const [currentStep, setCurrentStep] = React.useState(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [bookingComplete, setBookingComplete] = React.useState(false);
+  const [bookingError, setBookingError] = React.useState<string | null>(null);
+  const [confirmationNumber, setConfirmationNumber] = React.useState<string>('');
   const [formData, setFormData] = React.useState<BookingFormData>({
     pickupAddress: '',
     pickupDate: '',
@@ -100,9 +102,56 @@ export default function PatientBookRidePage() {
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsSubmitting(false);
-    setBookingComplete(true);
+    setBookingError(null);
+
+    try {
+      // Map transport type to vehicle type enum
+      const vehicleTypeMap: Record<string, string> = {
+        'Ambulatory': 'SEDAN',
+        'Wheelchair': 'WHEELCHAIR_ACCESSIBLE',
+        'Stretcher': 'STRETCHER_VAN',
+        'Bariatric': 'BARIATRIC_VEHICLE',
+      };
+
+      // Combine date and time into ISO string
+      const pickupDateTime = new Date(`${formData.pickupDate}T${formData.pickupTime}`);
+      const appointmentDateTime = new Date(`${formData.pickupDate}T${formData.appointmentTime}`);
+
+      const tripData = {
+        tripType: formData.isRoundTrip ? 'ROUND_TRIP' : 'ONE_WAY',
+        vehicleType: vehicleTypeMap[formData.transportType] || 'SEDAN',
+        pickupAddress: formData.pickupAddress,
+        dropoffAddress: formData.dropoffAddress,
+        pickupTime: pickupDateTime.toISOString(),
+        appointmentTime: appointmentDateTime.toISOString(),
+        notes: formData.specialInstructions || undefined,
+        wheelchairRequired: formData.transportType === 'Wheelchair',
+        stretcherRequired: formData.transportType === 'Stretcher',
+        bariatricRequired: formData.transportType === 'Bariatric',
+      };
+
+      const response = await fetch('/api/v1/trips', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tripData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to book trip');
+      }
+
+      setConfirmationNumber(result.data?.tripNumber || `RID-${Date.now().toString().slice(-6)}`);
+      setBookingComplete(true);
+    } catch (error) {
+      console.error('Booking error:', error);
+      setBookingError(error instanceof Error ? error.message : 'Failed to book trip. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const canProceed = () => {
@@ -134,7 +183,7 @@ export default function PatientBookRidePage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Confirmation #</span>
-                  <span className="font-medium">RID-{Date.now().toString().slice(-6)}</span>
+                  <span className="font-medium">{confirmationNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Date</span>
@@ -156,6 +205,8 @@ export default function PatientBookRidePage() {
               </Button>
               <Button onClick={() => {
                 setBookingComplete(false);
+                setBookingError(null);
+                setConfirmationNumber('');
                 setCurrentStep(1);
                 setFormData({
                   pickupAddress: '',
@@ -538,6 +589,13 @@ export default function PatientBookRidePage() {
                   and you will receive confirmation via SMS.
                 </p>
               </div>
+
+              {bookingError && (
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                  <p className="text-sm text-destructive font-medium">Booking Failed</p>
+                  <p className="text-sm text-destructive/80">{bookingError}</p>
+                </div>
+              )}
             </div>
           )}
 

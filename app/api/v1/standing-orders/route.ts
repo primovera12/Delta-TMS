@@ -1,227 +1,284 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { VehicleType, DayOfWeek } from '@prisma/client';
 
-// Mock standing orders data
-const standingOrders = [
-  {
-    id: 'SO-001',
-    patientId: 'PAT-001',
-    patientName: 'John Smith',
-    facilityId: 'FAC-002',
-    facilityName: 'City Dialysis Center',
-    vehicleType: 'wheelchair',
-    pickupAddress: '123 Main St, Houston, TX 77001',
-    dropoffAddress: '789 Health Blvd, Houston, TX 77002',
-    frequency: 'weekly',
-    daysOfWeek: ['monday', 'wednesday', 'friday'],
-    pickupTime: '08:00',
-    appointmentTime: '09:00',
-    returnTrip: true,
-    returnTime: '13:00',
-    specialInstructions: 'Patient requires assistance with wheelchair',
-    status: 'active',
-    startDate: '2026-01-01',
-    endDate: '2026-06-30',
-    createdAt: '2025-12-15T10:00:00Z',
-    updatedAt: '2026-01-10T14:30:00Z',
-  },
-  {
-    id: 'SO-002',
-    patientId: 'PAT-002',
-    patientName: 'Mary Jones',
-    facilityId: 'FAC-003',
-    facilityName: 'Heart Care Clinic',
-    vehicleType: 'ambulatory',
-    pickupAddress: '456 Oak Ave, Houston, TX 77003',
-    dropoffAddress: '890 Cardio Dr, Houston, TX 77004',
-    frequency: 'biweekly',
-    daysOfWeek: ['tuesday'],
-    pickupTime: '10:00',
-    appointmentTime: '11:00',
-    returnTrip: true,
-    returnTime: '14:00',
-    specialInstructions: '',
-    status: 'active',
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    createdAt: '2025-12-20T14:00:00Z',
-    updatedAt: '2025-12-20T14:00:00Z',
-  },
-  {
-    id: 'SO-003',
-    patientId: 'PAT-003',
-    patientName: 'Robert Brown',
-    facilityId: 'FAC-005',
-    facilityName: 'Cancer Treatment Center',
-    vehicleType: 'stretcher',
-    pickupAddress: '789 Pine Rd, Houston, TX 77005',
-    dropoffAddress: '567 Oncology Way, Houston, TX 77006',
-    frequency: 'weekly',
-    daysOfWeek: ['thursday'],
-    pickupTime: '07:30',
-    appointmentTime: '08:30',
-    returnTrip: true,
-    returnTime: '12:00',
-    specialInstructions: 'Patient on oxygen therapy',
-    status: 'paused',
-    pausedReason: 'Patient hospitalized',
-    startDate: '2025-11-01',
-    endDate: '2026-10-31',
-    createdAt: '2025-10-25T09:00:00Z',
-    updatedAt: '2026-01-05T11:00:00Z',
-  },
-];
-
+// GET /api/v1/standing-orders - List standing orders
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Filter parameters
-  const status = searchParams.get('status');
-  const patientId = searchParams.get('patientId');
-  const facilityId = searchParams.get('facilityId');
-  const frequency = searchParams.get('frequency');
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const patientId = searchParams.get('patientId');
+    const facilityId = searchParams.get('facilityId');
+    const frequency = searchParams.get('frequency');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-  // Pagination
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
+    // Build where clause
+    const where: Record<string, unknown> = {};
 
-  let filteredOrders = [...standingOrders];
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    }
 
-  // Apply filters
-  if (status) {
-    filteredOrders = filteredOrders.filter((order) => order.status === status);
+    if (patientId) {
+      where.patientUserId = patientId;
+    }
+
+    if (facilityId) {
+      where.facilityId = facilityId;
+    }
+
+    if (frequency) {
+      where.frequency = frequency;
+    }
+
+    const [orders, total, stats] = await Promise.all([
+      prisma.standingOrder.findMany({
+        where,
+        include: {
+          facility: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          facilityPatient: {
+            select: {
+              id: true,
+              userId: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.standingOrder.count({ where }),
+      // Get frequency breakdown
+      prisma.standingOrder.groupBy({
+        by: ['frequency'],
+        _count: true,
+      }),
+    ]);
+
+    // Get status counts
+    const [activeCount] = await Promise.all([
+      prisma.standingOrder.count({ where: { isActive: true } }),
+    ]);
+
+    // Transform for frontend
+    const transformedOrders = orders.map((order) => {
+      const patient = order.facilityPatient;
+      return {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        patientId: order.patientUserId || patient?.userId,
+        patientName: patient
+          ? `${patient.firstName} ${patient.lastName}`
+          : 'Unknown',
+        facilityId: order.facilityId,
+        facilityName: order.facility?.name || null,
+        vehicleType: order.vehicleType.toLowerCase().replace(/_/g, '-'),
+        pickupAddress: `${order.pickupAddressLine1}, ${order.pickupCity}, ${order.pickupState} ${order.pickupZipCode}`,
+        dropoffAddress: `${order.dropoffAddressLine1}, ${order.dropoffCity}, ${order.dropoffState} ${order.dropoffZipCode}`,
+        frequency: order.frequency,
+        daysOfWeek: order.daysOfWeek.map((d) => d.toLowerCase()),
+        pickupTime: order.pickupTime,
+        appointmentTime: order.appointmentTime,
+        returnTrip: order.includeReturn,
+        returnTime: order.returnTime,
+        isWillCall: order.isReturnWillCall,
+        specialInstructions: order.specialInstructions || '',
+        status: order.isActive ? 'active' : 'inactive',
+        startDate: order.startDate?.toISOString().split('T')[0] || null,
+        endDate: order.endDate?.toISOString().split('T')[0] || null,
+        createdAt: order.createdAt.toISOString(),
+        updatedAt: order.updatedAt.toISOString(),
+      };
+    });
+
+    // Build frequency breakdown
+    const frequencyBreakdown: Record<string, number> = {
+      daily: 0,
+      weekly: 0,
+      biweekly: 0,
+      monthly: 0,
+    };
+    stats.forEach((s) => {
+      frequencyBreakdown[s.frequency] = s._count;
+    });
+
+    const summary = {
+      totalOrders: total,
+      activeOrders: activeCount,
+      pausedOrders: 0, // No paused status in schema
+      byFrequency: frequencyBreakdown,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: transformedOrders,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching standing orders:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
   }
-
-  if (patientId) {
-    filteredOrders = filteredOrders.filter((order) => order.patientId === patientId);
-  }
-
-  if (facilityId) {
-    filteredOrders = filteredOrders.filter((order) => order.facilityId === facilityId);
-  }
-
-  if (frequency) {
-    filteredOrders = filteredOrders.filter((order) => order.frequency === frequency);
-  }
-
-  // Calculate pagination
-  const total = filteredOrders.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const paginatedOrders = filteredOrders.slice(offset, offset + limit);
-
-  // Summary stats
-  const summary = {
-    totalOrders: standingOrders.length,
-    activeOrders: standingOrders.filter((o) => o.status === 'active').length,
-    pausedOrders: standingOrders.filter((o) => o.status === 'paused').length,
-    byFrequency: {
-      daily: standingOrders.filter((o) => o.frequency === 'daily').length,
-      weekly: standingOrders.filter((o) => o.frequency === 'weekly').length,
-      biweekly: standingOrders.filter((o) => o.frequency === 'biweekly').length,
-      monthly: standingOrders.filter((o) => o.frequency === 'monthly').length,
-    },
-  };
-
-  return NextResponse.json({
-    success: true,
-    data: paginatedOrders,
-    summary,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  });
 }
 
+// POST /api/v1/standing-orders - Create a new standing order
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
       patientId,
-      patientName,
       facilityId,
-      facilityName,
+      facilityPatientId,
       vehicleType,
       pickupAddress,
+      pickupCity,
+      pickupState,
+      pickupZipCode,
+      pickupLat,
+      pickupLng,
       dropoffAddress,
+      dropoffCity,
+      dropoffState,
+      dropoffZipCode,
+      dropoffLat,
+      dropoffLng,
       frequency,
       daysOfWeek,
       pickupTime,
       appointmentTime,
       returnTrip,
       returnTime,
+      isWillCall,
       specialInstructions,
       startDate,
       endDate,
     } = body;
 
     // Validate required fields
-    if (!patientId || !facilityId || !pickupAddress || !dropoffAddress || !frequency || !daysOfWeek?.length) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields',
-        },
-        { status: 400 }
-      );
+    if (!pickupAddress || !dropoffAddress || !frequency || !daysOfWeek?.length || !pickupTime) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: pickupAddress, dropoffAddress, frequency, daysOfWeek, pickupTime',
+      }, { status: 400 });
     }
 
     // Validate frequency
-    const validFrequencies = ['daily', 'weekly', 'biweekly', 'monthly'];
+    const validFrequencies = ['daily', 'weekly', 'biweekly', 'monthly', 'custom'];
     if (!validFrequencies.includes(frequency)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}`,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}`,
+      }, { status: 400 });
     }
 
-    // Generate standing order ID
-    const orderId = `SO-${String(standingOrders.length + 1).padStart(3, '0')}`;
+    // Generate order number
+    const count = await prisma.standingOrder.count();
+    const orderNumber = `SO-${String(count + 1).padStart(5, '0')}`;
 
-    const newOrder = {
-      id: orderId,
-      patientId,
-      patientName: patientName || 'Unknown Patient',
-      facilityId,
-      facilityName: facilityName || 'Unknown Facility',
-      vehicleType: vehicleType || 'ambulatory',
-      pickupAddress,
-      dropoffAddress,
-      frequency,
-      daysOfWeek,
-      pickupTime,
-      appointmentTime,
-      returnTrip: returnTrip || false,
-      returnTime: returnTrip ? returnTime : null,
-      specialInstructions: specialInstructions || '',
-      status: 'active',
-      startDate: startDate || new Date().toISOString().split('T')[0],
-      endDate: endDate || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    // Convert days of week to enum
+    const dayEnumMap: Record<string, DayOfWeek> = {
+      sunday: DayOfWeek.SUNDAY,
+      monday: DayOfWeek.MONDAY,
+      tuesday: DayOfWeek.TUESDAY,
+      wednesday: DayOfWeek.WEDNESDAY,
+      thursday: DayOfWeek.THURSDAY,
+      friday: DayOfWeek.FRIDAY,
+      saturday: DayOfWeek.SATURDAY,
     };
+    const daysEnum = daysOfWeek.map((d: string) => dayEnumMap[d.toLowerCase()]).filter(Boolean);
 
-    // In real app, would save to database
+    const order = await prisma.standingOrder.create({
+      data: {
+        orderNumber,
+        createdById: session.user.id,
+        facilityId: facilityId || null,
+        facilityPatientId: facilityPatientId || null,
+        patientUserId: patientId || null,
+        frequency,
+        daysOfWeek: daysEnum,
+        pickupTime,
+        appointmentTime: appointmentTime || null,
+        pickupAddressLine1: pickupAddress,
+        pickupCity: pickupCity || 'Houston',
+        pickupState: pickupState || 'TX',
+        pickupZipCode: pickupZipCode || '77001',
+        pickupLatitude: pickupLat || 0,
+        pickupLongitude: pickupLng || 0,
+        dropoffAddressLine1: dropoffAddress,
+        dropoffCity: dropoffCity || 'Houston',
+        dropoffState: dropoffState || 'TX',
+        dropoffZipCode: dropoffZipCode || '77001',
+        dropoffLatitude: dropoffLat || 0,
+        dropoffLongitude: dropoffLng || 0,
+        includeReturn: returnTrip || false,
+        returnTime: returnTrip ? returnTime : null,
+        isReturnWillCall: isWillCall || false,
+        vehicleType: (vehicleType?.toUpperCase().replace(/-/g, '_') as VehicleType) || VehicleType.WHEELCHAIR_ACCESSIBLE,
+        specialInstructions: specialInstructions || null,
+        startDate: startDate ? new Date(startDate) : new Date(),
+        endDate: endDate ? new Date(endDate) : null,
+        isActive: true,
+      },
+      include: {
+        facility: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: newOrder,
+      data: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        facilityName: order.facility?.name || null,
+        frequency: order.frequency,
+        daysOfWeek: order.daysOfWeek.map((d) => d.toLowerCase()),
+        pickupTime: order.pickupTime,
+        status: 'active',
+        createdAt: order.createdAt.toISOString(),
+      },
       message: 'Standing order created successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating standing order:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create standing order',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to create standing order',
+    }, { status: 500 });
   }
 }

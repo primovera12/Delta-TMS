@@ -1,134 +1,166 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { InvoiceStatus } from '@prisma/client';
 
-// Mock payments data
-const payments = [
-  {
-    id: 'PAY-2026-0112',
-    invoiceId: 'INV-2026-0105',
-    facilityId: 'FAC-004',
-    facilityName: 'Heart Care Clinic',
-    amount: 2100.00,
-    method: 'ach',
-    reference: 'ACH-REF-12345',
-    status: 'completed',
-    processedAt: '2026-01-12T14:30:00Z',
-    createdAt: '2026-01-12T14:30:00Z',
-  },
-  {
-    id: 'PAY-2026-0110',
-    invoiceId: 'INV-2026-0102',
-    facilityId: 'FAC-001',
-    facilityName: 'Memorial Hospital',
-    amount: 5100.00,
-    method: 'check',
-    reference: 'CHK-45678',
-    status: 'completed',
-    processedAt: '2026-01-10T10:15:00Z',
-    createdAt: '2026-01-10T10:15:00Z',
-  },
-  {
-    id: 'PAY-2025-1228',
-    invoiceId: 'INV-2025-1231',
-    facilityId: 'FAC-002',
-    facilityName: 'City Dialysis Center',
-    amount: 9300.00,
-    method: 'wire',
-    reference: 'WIRE-REF-98765',
-    status: 'completed',
-    processedAt: '2025-12-28T09:00:00Z',
-    createdAt: '2025-12-28T09:00:00Z',
-  },
-];
-
+// GET /api/v1/payments - List payments
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Filter parameters
-  const facilityId = searchParams.get('facilityId');
-  const invoiceId = searchParams.get('invoiceId');
-  const method = searchParams.get('method');
-  const status = searchParams.get('status');
-  const startDate = searchParams.get('startDate');
-  const endDate = searchParams.get('endDate');
+    const { searchParams } = new URL(request.url);
+    const facilityId = searchParams.get('facilityId');
+    const invoiceId = searchParams.get('invoiceId');
+    const method = searchParams.get('method');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-  // Pagination
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
+    // Build where clause
+    const where: Record<string, unknown> = {};
 
-  let filteredPayments = [...payments];
+    if (invoiceId) {
+      where.invoiceId = invoiceId;
+    }
 
-  // Apply filters
-  if (facilityId) {
-    filteredPayments = filteredPayments.filter((p) => p.facilityId === facilityId);
-  }
+    if (facilityId) {
+      where.invoice = {
+        facilityId,
+      };
+    }
 
-  if (invoiceId) {
-    filteredPayments = filteredPayments.filter((p) => p.invoiceId === invoiceId);
-  }
+    if (method) {
+      where.paymentMethod = method;
+    }
 
-  if (method) {
-    filteredPayments = filteredPayments.filter((p) => p.method === method);
-  }
+    if (startDate || endDate) {
+      where.paymentDate = {};
+      if (startDate) {
+        (where.paymentDate as Record<string, Date>).gte = new Date(startDate);
+      }
+      if (endDate) {
+        (where.paymentDate as Record<string, Date>).lte = new Date(endDate);
+      }
+    }
 
-  if (status) {
-    filteredPayments = filteredPayments.filter((p) => p.status === status);
-  }
+    const [payments, total, methodStats] = await Promise.all([
+      prisma.invoicePayment.findMany({
+        where,
+        include: {
+          invoice: {
+            include: {
+              facility: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          paymentDate: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.invoicePayment.count({ where }),
+      // Get method breakdown
+      prisma.invoicePayment.groupBy({
+        by: ['paymentMethod'],
+        _sum: {
+          amount: true,
+        },
+        _count: true,
+      }),
+    ]);
 
-  if (startDate) {
-    filteredPayments = filteredPayments.filter(
-      (p) => new Date(p.processedAt) >= new Date(startDate)
+    // Get total collected
+    const totalCollectedStats = await prisma.invoicePayment.aggregate({
+      _sum: {
+        amount: true,
+      },
+    });
+
+    // Get pending payments count (invoices with outstanding amount)
+    const pendingPaymentsCount = await prisma.invoice.count({
+      where: {
+        status: {
+          in: [InvoiceStatus.SENT, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID],
+        },
+        amountDue: {
+          gt: 0,
+        },
+      },
+    });
+
+    // Transform for frontend
+    const transformedPayments = payments.map((payment) => ({
+      id: payment.id,
+      invoiceId: payment.invoiceId,
+      invoiceNumber: payment.invoice.invoiceNumber,
+      facilityId: payment.invoice.facilityId,
+      facilityName: payment.invoice.facility.name,
+      amount: payment.amount,
+      method: payment.paymentMethod,
+      reference: payment.paymentReference,
+      notes: payment.notes,
+      processedAt: payment.paymentDate.toISOString(),
+      createdAt: payment.createdAt.toISOString(),
+    }));
+
+    // Build method breakdown
+    const byMethod: Record<string, number> = {
+      ach: 0,
+      check: 0,
+      wire: 0,
+      card: 0,
+      cash: 0,
+    };
+    methodStats.forEach((stat) => {
+      if (stat.paymentMethod) {
+        byMethod[stat.paymentMethod] = stat._sum.amount || 0;
+      }
+    });
+
+    const summary = {
+      totalCollected: totalCollectedStats._sum.amount || 0,
+      pendingPayments: pendingPaymentsCount,
+      byMethod,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: transformedPayments,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
     );
   }
-
-  if (endDate) {
-    filteredPayments = filteredPayments.filter(
-      (p) => new Date(p.processedAt) <= new Date(endDate)
-    );
-  }
-
-  // Calculate pagination
-  const total = filteredPayments.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const paginatedPayments = filteredPayments.slice(offset, offset + limit);
-
-  // Calculate summary
-  const summary = {
-    totalCollected: filteredPayments
-      .filter((p) => p.status === 'completed')
-      .reduce((sum, p) => sum + p.amount, 0),
-    pendingPayments: filteredPayments.filter((p) => p.status === 'pending').length,
-    byMethod: {
-      ach: filteredPayments
-        .filter((p) => p.method === 'ach')
-        .reduce((sum, p) => sum + p.amount, 0),
-      check: filteredPayments
-        .filter((p) => p.method === 'check')
-        .reduce((sum, p) => sum + p.amount, 0),
-      wire: filteredPayments
-        .filter((p) => p.method === 'wire')
-        .reduce((sum, p) => sum + p.amount, 0),
-      card: filteredPayments
-        .filter((p) => p.method === 'card')
-        .reduce((sum, p) => sum + p.amount, 0),
-    },
-  };
-
-  return NextResponse.json({
-    success: true,
-    data: paginatedPayments,
-    summary,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  });
 }
 
+// POST /api/v1/payments - Record a new payment
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
@@ -136,69 +168,108 @@ export async function POST(request: NextRequest) {
       amount,
       method,
       reference,
+      paymentDate,
       notes,
     } = body;
 
     // Validate required fields
     if (!invoiceId || !amount || !method) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: invoiceId, amount, method',
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: invoiceId, amount, method',
+      }, { status: 400 });
     }
 
     // Validate payment method
     const validMethods = ['ach', 'check', 'wire', 'card', 'cash'];
     if (!validMethods.includes(method)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid payment method. Must be one of: ${validMethods.join(', ')}`,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: `Invalid payment method. Must be one of: ${validMethods.join(', ')}`,
+      }, { status: 400 });
     }
 
-    // Generate payment ID
-    const today = new Date();
-    const paymentId = `PAY-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    // Verify invoice exists and get current balance
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        facility: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
 
-    const newPayment = {
-      id: paymentId,
-      invoiceId,
-      facilityId: 'FAC-001', // Would be fetched from invoice
-      facilityName: 'Mock Facility', // Would be fetched from facility
-      amount,
-      method,
-      reference: reference || `${method.toUpperCase()}-${Date.now()}`,
-      status: 'completed',
-      notes,
-      processedAt: today.toISOString(),
-      createdAt: today.toISOString(),
-    };
+    if (!invoice) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invoice not found',
+      }, { status: 404 });
+    }
 
-    // In real app, would:
-    // 1. Save payment to database
-    // 2. Update invoice status to 'paid'
-    // 3. Send payment confirmation email
-    // 4. Log activity
+    // Validate amount doesn't exceed balance
+    if (amount > invoice.amountDue) {
+      return NextResponse.json({
+        success: false,
+        error: `Payment amount ($${amount}) exceeds invoice balance ($${invoice.amountDue})`,
+      }, { status: 400 });
+    }
+
+    // Create payment and update invoice in transaction
+    const [payment] = await prisma.$transaction([
+      // Create payment record
+      prisma.invoicePayment.create({
+        data: {
+          invoiceId,
+          amount,
+          paymentMethod: method,
+          paymentReference: reference || null,
+          paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
+          recordedById: session.user.id,
+          notes: notes || null,
+        },
+      }),
+      // Update invoice amounts
+      prisma.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          amountPaid: {
+            increment: amount,
+          },
+          amountDue: {
+            decrement: amount,
+          },
+          status: amount >= invoice.amountDue
+            ? InvoiceStatus.PAID
+            : InvoiceStatus.PARTIALLY_PAID,
+          paidAt: amount >= invoice.amountDue ? new Date() : null,
+        },
+      }),
+    ]);
 
     return NextResponse.json({
       success: true,
-      data: newPayment,
-      message: 'Payment recorded successfully',
+      data: {
+        id: payment.id,
+        invoiceId: payment.invoiceId,
+        invoiceNumber: invoice.invoiceNumber,
+        facilityName: invoice.facility.name,
+        amount: payment.amount,
+        method: payment.paymentMethod,
+        reference: payment.paymentReference,
+        processedAt: payment.paymentDate.toISOString(),
+        createdAt: payment.createdAt.toISOString(),
+      },
+      message: amount >= invoice.amountDue
+        ? 'Payment recorded - Invoice fully paid'
+        : 'Partial payment recorded successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error recording payment:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to record payment',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to record payment',
+    }, { status: 500 });
   }
 }

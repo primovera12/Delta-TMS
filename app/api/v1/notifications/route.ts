@@ -1,238 +1,256 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { NotificationChannel } from '@prisma/client';
 
-// Mock notifications data
-const notifications = [
-  {
-    id: 'NOT-001',
-    userId: 'USR-001',
-    type: 'trip_update',
-    category: 'trip',
-    title: 'Trip Running Late',
-    message: 'Trip TR-20260115-012 is running 10 minutes late. ETA updated.',
-    data: { tripId: 'TR-20260115-012', newEta: '10:40 AM' },
-    read: false,
-    actionUrl: '/dispatcher/trips/TR-20260115-012',
-    createdAt: '2026-01-15T10:28:00Z',
-  },
-  {
-    id: 'NOT-002',
-    userId: 'USR-001',
-    type: 'trip_completed',
-    category: 'trip',
-    title: 'Trip Completed',
-    message: 'Trip TR-20260115-008 has been completed successfully.',
-    data: { tripId: 'TR-20260115-008' },
-    read: false,
-    actionUrl: '/dispatcher/trips/TR-20260115-008',
-    createdAt: '2026-01-15T10:15:00Z',
-  },
-  {
-    id: 'NOT-003',
-    userId: 'USR-001',
-    type: 'driver_available',
-    category: 'driver',
-    title: 'Driver Now Available',
-    message: 'John Smith has completed their trip and is now available.',
-    data: { driverId: 'DRV-001', driverName: 'John Smith' },
-    read: false,
-    createdAt: '2026-01-15T10:10:00Z',
-  },
-  {
-    id: 'NOT-004',
-    userId: 'USR-001',
-    type: 'invoice_overdue',
-    category: 'billing',
-    title: 'Invoice Overdue',
-    message: 'Invoice INV-2026-0108 for Regional Medical Center is overdue.',
-    data: { invoiceId: 'INV-2026-0108', amount: 3200 },
-    read: true,
-    actionUrl: '/admin/billing/INV-2026-0108',
-    createdAt: '2026-01-15T09:00:00Z',
-  },
-  {
-    id: 'NOT-005',
-    userId: 'USR-001',
-    type: 'system',
-    category: 'system',
-    title: 'System Update',
-    message: 'Scheduled maintenance tonight from 2 AM to 4 AM EST.',
-    data: {},
-    read: true,
-    createdAt: '2026-01-15T07:00:00Z',
-  },
-  {
-    id: 'NOT-006',
-    userId: 'USR-001',
-    type: 'document_expiring',
-    category: 'compliance',
-    title: 'Document Expiring Soon',
-    message: 'Driver John Smith\'s insurance expires in 15 days.',
-    data: { driverId: 'DRV-001', documentType: 'insurance', daysUntilExpiry: 15 },
-    read: true,
-    actionUrl: '/admin/drivers/DRV-001/documents',
-    createdAt: '2026-01-14T14:00:00Z',
-  },
-];
-
+// GET /api/v1/notifications - List notifications
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Filter parameters
-  const userId = searchParams.get('userId');
-  const category = searchParams.get('category');
-  const read = searchParams.get('read');
-  const type = searchParams.get('type');
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId') || session.user.id;
+    const category = searchParams.get('category');
+    const type = searchParams.get('type');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
-  // Pagination
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '50');
+    // Build where clause
+    const where: Record<string, unknown> = {
+      userId,
+    };
 
-  let filteredNotifications = [...notifications];
+    if (category) {
+      // Map category to notification types
+      const categoryTypeMap: Record<string, string[]> = {
+        trip: ['TRIP_SCHEDULED', 'TRIP_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'TRIP_STARTED', 'TRIP_COMPLETED', 'TRIP_CANCELLED', 'REMINDER_1H', 'REMINDER_30M'],
+        billing: ['PAYMENT_RECEIVED', 'PAYMENT_FAILED', 'INVOICE_SENT', 'INVOICE_OVERDUE'],
+        compliance: ['DOCUMENT_EXPIRING', 'STANDING_ORDER_CREATED'],
+        driver: ['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED'],
+      };
+      if (categoryTypeMap[category]) {
+        where.type = { in: categoryTypeMap[category] };
+      }
+    }
 
-  // Apply filters
-  if (userId) {
-    filteredNotifications = filteredNotifications.filter((n) => n.userId === userId);
-  }
+    if (type) {
+      where.type = type;
+    }
 
-  if (category) {
-    filteredNotifications = filteredNotifications.filter((n) => n.category === category);
-  }
+    const [notifications, total, allNotifications] = await Promise.all([
+      prisma.notificationLog.findMany({
+        where,
+        orderBy: {
+          sentAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.notificationLog.count({ where }),
+      // Get category breakdown
+      prisma.notificationLog.groupBy({
+        by: ['type'],
+        where: { userId },
+        _count: true,
+      }),
+    ]);
 
-  if (read !== null && read !== undefined) {
-    const isRead = read === 'true';
-    filteredNotifications = filteredNotifications.filter((n) => n.read === isRead);
-  }
+    // Transform for frontend
+    const transformedNotifications = notifications.map((notification) => {
+      // Determine category from type
+      let notifCategory = 'system';
+      const typeStr = notification.type as string;
+      if (typeStr.includes('TRIP') || typeStr.includes('DRIVER') || typeStr.includes('REMINDER')) {
+        notifCategory = 'trip';
+      } else if (typeStr.includes('PAYMENT') || typeStr.includes('INVOICE')) {
+        notifCategory = 'billing';
+      } else if (typeStr.includes('DOCUMENT')) {
+        notifCategory = 'compliance';
+      }
 
-  if (type) {
-    filteredNotifications = filteredNotifications.filter((n) => n.type === type);
-  }
+      return {
+        id: notification.id,
+        userId: notification.userId,
+        type: notification.type,
+        category: notifCategory,
+        title: notification.subject || 'Notification',
+        message: notification.content,
+        read: notification.status === 'delivered',
+        createdAt: notification.sentAt?.toISOString() || notification.createdAt?.toISOString(),
+      };
+    });
 
-  // Sort by createdAt descending (newest first)
-  filteredNotifications.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+    // Build category breakdown
+    const byCategory: Record<string, number> = {
+      trip: 0,
+      driver: 0,
+      billing: 0,
+      compliance: 0,
+      system: 0,
+    };
 
-  // Calculate pagination
-  const total = filteredNotifications.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const paginatedNotifications = filteredNotifications.slice(offset, offset + limit);
+    allNotifications.forEach((item) => {
+      const typeStr = item.type as string;
+      if (typeStr.includes('TRIP') || typeStr.includes('REMINDER')) {
+        byCategory.trip += item._count;
+      } else if (typeStr.includes('DRIVER')) {
+        byCategory.driver += item._count;
+      } else if (typeStr.includes('PAYMENT') || typeStr.includes('INVOICE')) {
+        byCategory.billing += item._count;
+      } else if (typeStr.includes('DOCUMENT')) {
+        byCategory.compliance += item._count;
+      } else {
+        byCategory.system += item._count;
+      }
+    });
 
-  // Summary
-  const summary = {
-    total: notifications.length,
-    unread: notifications.filter((n) => !n.read).length,
-    byCategory: {
-      trip: notifications.filter((n) => n.category === 'trip').length,
-      driver: notifications.filter((n) => n.category === 'driver').length,
-      billing: notifications.filter((n) => n.category === 'billing').length,
-      compliance: notifications.filter((n) => n.category === 'compliance').length,
-      system: notifications.filter((n) => n.category === 'system').length,
-    },
-  };
+    // Count undelivered as unread
+    const unreadCount = await prisma.notificationLog.count({
+      where: {
+        userId,
+        status: { not: 'delivered' },
+      },
+    });
 
-  return NextResponse.json({
-    success: true,
-    data: paginatedNotifications,
-    summary,
-    pagination: {
-      page,
-      limit,
+    const summary = {
       total,
-      totalPages,
-    },
-  });
+      unread: unreadCount,
+      byCategory,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: transformedNotifications,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
 
+// POST /api/v1/notifications - Create a notification
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
       userId,
       type,
-      category,
       title,
       message,
-      data,
-      actionUrl,
+      channel,
     } = body;
 
     // Validate required fields
-    if (!userId || !type || !title || !message) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: userId, type, title, message',
-        },
-        { status: 400 }
-      );
+    if (!userId || !type || !message) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: userId, type, message',
+      }, { status: 400 });
     }
 
-    // Generate notification ID
-    const notificationId = `NOT-${Date.now().toString(36).toUpperCase()}`;
-
-    const newNotification = {
-      id: notificationId,
-      userId,
-      type,
-      category: category || 'system',
-      title,
-      message,
-      data: data || {},
-      read: false,
-      actionUrl,
-      createdAt: new Date().toISOString(),
-    };
-
-    // In real app, would:
-    // 1. Save to database
-    // 2. Send push notification if enabled
-    // 3. Send email/SMS if configured
+    const notification = await prisma.notificationLog.create({
+      data: {
+        userId,
+        type,
+        channel: channel || NotificationChannel.IN_APP,
+        subject: title || null,
+        content: message,
+        status: 'sent',
+        sentAt: new Date(),
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: newNotification,
+      data: {
+        id: notification.id,
+        userId: notification.userId,
+        type: notification.type,
+        title: notification.subject,
+        message: notification.content,
+        read: false,
+        createdAt: notification.sentAt?.toISOString(),
+      },
       message: 'Notification created successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating notification:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create notification',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to create notification',
+    }, { status: 500 });
   }
 }
 
-// Mark all as read
+// PATCH /api/v1/notifications - Mark notifications as read (delivered)
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { userId, notificationIds } = body;
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId is required' },
-        { status: 400 }
-      );
-    }
+    const targetUserId = userId || session.user.id;
 
-    // In real app, would update notifications in database
-    const updatedCount = notificationIds?.length || notifications.filter((n) => n.userId === userId && !n.read).length;
+    let result;
+    if (notificationIds && Array.isArray(notificationIds) && notificationIds.length > 0) {
+      // Mark specific notifications as delivered
+      result = await prisma.notificationLog.updateMany({
+        where: {
+          id: { in: notificationIds },
+          userId: targetUserId,
+        },
+        data: {
+          status: 'delivered',
+          deliveredAt: new Date(),
+        },
+      });
+    } else {
+      // Mark all notifications as delivered
+      result = await prisma.notificationLog.updateMany({
+        where: {
+          userId: targetUserId,
+          status: { not: 'delivered' },
+        },
+        data: {
+          status: 'delivered',
+          deliveredAt: new Date(),
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      message: `${updatedCount} notifications marked as read`,
-      updatedCount,
+      message: `${result.count} notifications marked as read`,
+      updatedCount: result.count,
     });
   } catch (error) {
     console.error('Error updating notifications:', error);
-    return NextResponse.json(
-      { success: false, error: 'Failed to update notifications' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to update notifications',
+    }, { status: 500 });
   }
 }

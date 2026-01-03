@@ -67,7 +67,7 @@ export async function GET(
         },
         statusHistory: {
           orderBy: {
-            timestamp: 'asc',
+            createdAt: 'asc',
           },
           include: {
             changedBy: {
@@ -97,10 +97,10 @@ export async function GET(
       id: trip.id,
       tripNumber: trip.tripNumber,
       patientId: primaryPassenger?.userId || null,
-      patientName: primaryPassenger
+      patientName: primaryPassenger?.user
         ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
         : 'Unknown',
-      patientPhone: primaryPassenger?.user.phone || null,
+      patientPhone: primaryPassenger?.user?.phone || null,
       driverId: trip.driverId,
       driverName: trip.driver
         ? `${trip.driver.user.firstName} ${trip.driver.user.lastName}`
@@ -147,8 +147,8 @@ export async function GET(
       },
       notes: trip.dispatcherNotes || '',
       timeline: trip.statusHistory.map((h) => ({
-        status: h.status.toLowerCase().replace(/_/g, '-'),
-        timestamp: h.timestamp.toISOString(),
+        status: h.newStatus.toLowerCase().replace(/_/g, '-'),
+        timestamp: h.createdAt.toISOString(),
         actor: h.changedBy ? `${h.changedBy.firstName} ${h.changedBy.lastName}` : 'System',
         notes: h.notes || null,
       })),
@@ -226,7 +226,7 @@ export async function PATCH(
       await prisma.tripStatusHistory.create({
         data: {
           tripId: id,
-          status: newStatus,
+          newStatus: newStatus,
           previousStatus: existingTrip.status,
           changedById: session.user.id,
           notes: body.statusNotes || null,
@@ -273,7 +273,7 @@ export async function PATCH(
         driverName: updatedTrip.driver
           ? `${updatedTrip.driver.user.firstName} ${updatedTrip.driver.user.lastName}`
           : null,
-        patientName: primaryPassenger
+        patientName: primaryPassenger?.user
           ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
           : 'Unknown',
         updatedAt: updatedTrip.updatedAt.toISOString(),
@@ -332,7 +332,7 @@ export async function DELETE(
     await prisma.tripStatusHistory.create({
       data: {
         tripId: id,
-        status: TripStatus.CANCELLED,
+        newStatus: TripStatus.CANCELLED,
         previousStatus: trip.status,
         changedById: session.user.id,
         notes: 'Trip cancelled',

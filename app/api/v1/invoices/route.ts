@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-import { InvoiceStatus } from '@prisma/client';
+import { InvoiceStatus, TripStatus } from '@prisma/client';
 
 // GET /api/v1/invoices - List invoices
 export async function GET(request: NextRequest) {
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               amount: true,
-              paidAt: true,
+              paymentDate: true,
             },
           },
         },
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     });
 
     const pendingCount = await prisma.invoice.count({
-      where: { status: InvoiceStatus.PENDING },
+      where: { status: InvoiceStatus.DRAFT },
     });
 
     // Transform for frontend
@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
             gte: new Date(periodStart),
             lte: new Date(periodEnd),
           },
-          status: 'COMPLETED',
+          status: TripStatus.COMPLETED,
         };
 
     const trips = await prisma.trip.findMany({

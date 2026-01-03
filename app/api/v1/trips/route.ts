@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
         id: trip.id,
         tripNumber: trip.tripNumber,
         patientId: primaryPassenger?.userId || null,
-        patientName: primaryPassenger
+        patientName: primaryPassenger?.user
           ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
           : 'Unknown',
         driverId: trip.driverId,
@@ -281,8 +281,8 @@ export async function POST(request: NextRequest) {
           create: {
             userId: body.patientId,
             isPrimary: true,
-            pickupStopIndex: 0,
-            dropoffStopIndex: 1,
+            firstName: body.patientFirstName || 'Unknown',
+            lastName: body.patientLastName || 'Patient',
           },
         },
       },
@@ -307,7 +307,7 @@ export async function POST(request: NextRequest) {
         id: trip.id,
         tripNumber: trip.tripNumber,
         patientId: primaryPassenger?.userId,
-        patientName: primaryPassenger
+        patientName: primaryPassenger?.user
           ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
           : 'Unknown',
         status: trip.status.toLowerCase(),

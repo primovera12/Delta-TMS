@@ -1,98 +1,163 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { InvoiceStatus } from '@prisma/client';
 
-// Mock invoice detail data
-const getInvoiceById = (id: string) => ({
-  id,
-  facilityId: 'FAC-001',
-  facility: {
-    id: 'FAC-001',
-    name: 'Memorial Hospital',
-    address: '1234 Medical Center Dr',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77001',
-    contact: 'Jane Wilson',
-    email: 'billing@memorial.com',
-    phone: '(555) 123-4567',
-  },
-  amount: 4250.00,
-  subtotal: 4250.00,
-  tax: 0,
-  discount: 0,
-  trips: [
-    {
-      id: 'TR-20260115-001',
-      date: '2026-01-15',
-      time: '10:30 AM',
-      patient: 'John Smith',
-      pickup: '123 Main St',
-      dropoff: 'Memorial Hospital',
-      vehicleType: 'Wheelchair',
-      distance: 12.5,
-      fare: 85.00,
-    },
-    {
-      id: 'TR-20260114-045',
-      date: '2026-01-14',
-      time: '3:30 PM',
-      patient: 'Susan Miller',
-      pickup: '456 Oak Ave',
-      dropoff: 'Memorial Hospital',
-      vehicleType: 'Ambulatory',
-      distance: 8.2,
-      fare: 65.00,
-    },
-  ],
-  period: { start: '2026-01-01', end: '2026-01-15' },
-  issueDate: '2026-01-15',
-  dueDate: '2026-01-30',
-  status: 'pending',
-  paymentTerms: 'net15',
-  notes: 'Net 15 payment terms. Please reference invoice number on payment.',
-  activity: [
-    {
-      action: 'created',
-      timestamp: '2026-01-15T09:00:00Z',
-      user: 'System',
-    },
-    {
-      action: 'sent',
-      timestamp: '2026-01-15T09:05:00Z',
-      user: 'System',
-      details: 'Sent to billing@memorial.com',
-    },
-  ],
-  createdAt: '2026-01-15T09:00:00Z',
-  updatedAt: '2026-01-15T09:05:00Z',
-});
-
+// GET /api/v1/invoices/[id] - Get invoice details
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!id) {
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Invoice ID is required' },
+        { status: 400 }
+      );
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        facility: {
+          select: {
+            id: true,
+            name: true,
+            addressLine1: true,
+            city: true,
+            state: true,
+            zipCode: true,
+            billingContactName: true,
+            billingEmail: true,
+            phone: true,
+          },
+        },
+        payments: {
+          orderBy: {
+            paymentDate: 'desc',
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      return NextResponse.json(
+        { success: false, error: 'Invoice not found' },
+        { status: 404 }
+      );
+    }
+
+    // Parse line items (stored as JSON)
+    const lineItems = invoice.lineItems as Array<{
+      tripId: string;
+      tripNumber: string;
+      date: string;
+      amount: number;
+    }> || [];
+
+    // Transform for frontend
+    const transformedInvoice = {
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      facilityId: invoice.facilityId,
+      facility: {
+        id: invoice.facility.id,
+        name: invoice.facility.name,
+        address: invoice.facility.addressLine1,
+        city: invoice.facility.city,
+        state: invoice.facility.state,
+        zip: invoice.facility.zipCode,
+        contact: invoice.facility.billingContactName || '',
+        email: invoice.facility.billingEmail || '',
+        phone: invoice.facility.phone || '',
+      },
+      amount: invoice.totalAmount,
+      subtotal: invoice.subtotal,
+      tax: invoice.taxAmount || 0,
+      discount: invoice.discountAmount || 0,
+      amountPaid: invoice.amountPaid,
+      amountDue: invoice.amountDue,
+      trips: lineItems.map((item) => ({
+        id: item.tripId,
+        tripNumber: item.tripNumber,
+        date: item.date.split('T')[0],
+        fare: item.amount,
+      })),
+      tripCount: invoice.tripCount,
+      period: {
+        start: invoice.periodStart.toISOString().split('T')[0],
+        end: invoice.periodEnd.toISOString().split('T')[0],
+      },
+      issueDate: invoice.createdAt.toISOString().split('T')[0],
+      dueDate: invoice.dueDate.toISOString().split('T')[0],
+      status: invoice.status.toLowerCase(),
+      paymentTerms: `net${Math.round((invoice.dueDate.getTime() - invoice.createdAt.getTime()) / (1000 * 60 * 60 * 24))}`,
+      notes: invoice.notes || '',
+      internalNotes: invoice.internalNotes || '',
+      payments: invoice.payments.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        method: p.paymentMethod,
+        reference: p.paymentReference,
+        date: p.paymentDate.toISOString(),
+        notes: p.notes,
+      })),
+      activity: [
+        {
+          action: 'created',
+          timestamp: invoice.createdAt.toISOString(),
+          user: 'System',
+        },
+        ...(invoice.sentAt ? [{
+          action: 'sent',
+          timestamp: invoice.sentAt.toISOString(),
+          user: 'System',
+          details: `Sent to ${invoice.facility.billingEmail}`,
+        }] : []),
+        ...(invoice.paidAt ? [{
+          action: 'paid',
+          timestamp: invoice.paidAt.toISOString(),
+          user: 'System',
+          details: 'Payment received',
+        }] : []),
+      ],
+      sentAt: invoice.sentAt?.toISOString() || null,
+      paidAt: invoice.paidAt?.toISOString() || null,
+      createdAt: invoice.createdAt.toISOString(),
+      updatedAt: invoice.updatedAt.toISOString(),
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: transformedInvoice,
+    });
+  } catch (error) {
+    console.error('Error fetching invoice:', error);
     return NextResponse.json(
-      { success: false, error: 'Invoice ID is required' },
-      { status: 400 }
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
     );
   }
-
-  // In real app, would fetch from database
-  const invoice = getInvoiceById(id);
-
-  return NextResponse.json({
-    success: true,
-    data: invoice,
-  });
 }
 
+// PATCH /api/v1/invoices/[id] - Update invoice
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
     const body = await request.json();
 
@@ -103,38 +168,84 @@ export async function PATCH(
       );
     }
 
-    const { status, notes, dueDate, paidDate, paymentMethod, paymentReference } = body;
+    // Check if invoice exists
+    const existingInvoice = await prisma.invoice.findUnique({
+      where: { id },
+    });
 
-    // In real app, would update in database
-    const invoice = getInvoiceById(id);
-
-    const updatedInvoice = {
-      ...invoice,
-      ...(status && { status }),
-      ...(notes && { notes }),
-      ...(dueDate && { dueDate }),
-      ...(paidDate && { paidDate }),
-      ...(paymentMethod && { paymentMethod }),
-      ...(paymentReference && { paymentReference }),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Add activity log entry
-    if (status === 'paid') {
-      updatedInvoice.activity = [
-        ...invoice.activity,
-        {
-          action: 'paid',
-          timestamp: new Date().toISOString(),
-          user: 'Admin User',
-          details: paymentMethod ? `Payment received via ${paymentMethod}` : 'Payment received',
-        },
-      ];
+    if (!existingInvoice) {
+      return NextResponse.json(
+        { success: false, error: 'Invoice not found' },
+        { status: 404 }
+      );
     }
+
+    const {
+      status,
+      notes,
+      internalNotes,
+      dueDate,
+    } = body;
+
+    // Build update data
+    const updateData: Record<string, unknown> = {};
+
+    if (status) {
+      const statusMap: Record<string, InvoiceStatus> = {
+        draft: InvoiceStatus.DRAFT,
+        sent: InvoiceStatus.SENT,
+        viewed: InvoiceStatus.VIEWED,
+        paid: InvoiceStatus.PAID,
+        partially_paid: InvoiceStatus.PARTIALLY_PAID,
+        overdue: InvoiceStatus.OVERDUE,
+        cancelled: InvoiceStatus.CANCELLED,
+        disputed: InvoiceStatus.DISPUTED,
+      };
+
+      if (statusMap[status]) {
+        updateData.status = statusMap[status];
+
+        // Set sentAt when status changes to sent
+        if (status === 'sent' && !existingInvoice.sentAt) {
+          updateData.sentAt = new Date();
+        }
+
+        // Set paidAt when status changes to paid
+        if (status === 'paid') {
+          updateData.paidAt = new Date();
+          updateData.amountDue = 0;
+          updateData.amountPaid = existingInvoice.totalAmount;
+        }
+      }
+    }
+
+    if (notes !== undefined) updateData.notes = notes;
+    if (internalNotes !== undefined) updateData.internalNotes = internalNotes;
+    if (dueDate) updateData.dueDate = new Date(dueDate);
+
+    const invoice = await prisma.invoice.update({
+      where: { id },
+      data: updateData,
+      include: {
+        facility: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: updatedInvoice,
+      data: {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        facilityName: invoice.facility.name,
+        status: invoice.status.toLowerCase(),
+        amount: invoice.totalAmount,
+        amountDue: invoice.amountDue,
+        updatedAt: invoice.updatedAt.toISOString(),
+      },
       message: 'Invoice updated successfully',
     });
   } catch (error) {
@@ -146,24 +257,66 @@ export async function PATCH(
   }
 }
 
+// DELETE /api/v1/invoices/[id] - Cancel/void invoice
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  if (!id) {
+    const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, error: 'Invoice ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Check if invoice exists
+    const existingInvoice = await prisma.invoice.findUnique({
+      where: { id },
+      include: {
+        payments: true,
+      },
+    });
+
+    if (!existingInvoice) {
+      return NextResponse.json(
+        { success: false, error: 'Invoice not found' },
+        { status: 404 }
+      );
+    }
+
+    // Cannot delete paid or partially paid invoices
+    if (existingInvoice.status === InvoiceStatus.PAID || existingInvoice.payments.length > 0) {
+      return NextResponse.json({
+        success: false,
+        error: 'Cannot delete an invoice that has payments recorded',
+      }, { status: 400 });
+    }
+
+    // Void the invoice instead of deleting
+    await prisma.invoice.update({
+      where: { id },
+      data: {
+        status: InvoiceStatus.CANCELLED,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Invoice ${existingInvoice.invoiceNumber} cancelled successfully`,
+    });
+  } catch (error) {
+    console.error('Error deleting invoice:', error);
     return NextResponse.json(
-      { success: false, error: 'Invoice ID is required' },
-      { status: 400 }
+      { success: false, error: 'Failed to delete invoice' },
+      { status: 500 }
     );
   }
-
-  // In real app, would check invoice status (can't delete paid invoices)
-  // and delete from database
-
-  return NextResponse.json({
-    success: true,
-    message: `Invoice ${id} deleted successfully`,
-  });
 }
