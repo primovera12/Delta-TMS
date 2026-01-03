@@ -1,117 +1,59 @@
 'use client';
 
-import * as React from 'react';
-import { Shield, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-
-// Simple compliance data
-const complianceItems = [
-  { id: '1', name: "Driver's License - John Smith", status: 'expiring', category: 'Driver' },
-  { id: '2', name: "Driver's License - Sarah Johnson", status: 'compliant', category: 'Driver' },
-  { id: '3', name: 'Background Check - Mike Davis', status: 'expired', category: 'Driver' },
-  { id: '4', name: 'Vehicle Registration - Van #102', status: 'compliant', category: 'Vehicle' },
-  { id: '5', name: 'Annual Inspection - Van #103', status: 'compliant', category: 'Vehicle' },
-  { id: '6', name: 'General Liability Insurance', status: 'compliant', category: 'Company' },
-  { id: '7', name: 'CPR Certification - John Smith', status: 'expiring', category: 'Training' },
-  { id: '8', name: 'HIPAA Training - All Staff', status: 'missing', category: 'Training' },
-];
-
+// Ultra-minimal compliance page using only native HTML to debug
 export default function AdminCompliancePage() {
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'compliant':
-        return <Badge variant="success">Compliant</Badge>;
-      case 'expiring':
-        return <Badge variant="warning">Expiring Soon</Badge>;
-      case 'expired':
-        return <Badge variant="error">Expired</Badge>;
-      case 'missing':
-        return <Badge variant="error">Missing</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'compliant':
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case 'expiring':
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
-      case 'expired':
-      case 'missing':
-        return <XCircle className="h-5 w-5 text-red-600" />;
-      default:
-        return null;
-    }
-  };
-
-  const compliantCount = complianceItems.filter(i => i.status === 'compliant').length;
-  const issueCount = complianceItems.length - compliantCount;
-  const complianceRate = Math.round((compliantCount / complianceItems.length) * 100);
+  const items = [
+    { id: '1', name: "Driver's License - John Smith", status: 'expiring' },
+    { id: '2', name: "Driver's License - Sarah Johnson", status: 'compliant' },
+    { id: '3', name: 'Background Check - Mike Davis', status: 'expired' },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Compliance Dashboard</h1>
-        <p className="text-sm text-gray-500">Monitor regulatory compliance and document expiration</p>
+    <div style={{ padding: '24px' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
+        Compliance Dashboard
+      </h1>
+      <p style={{ color: '#6b7280', marginBottom: '24px' }}>
+        Monitor regulatory compliance and document expiration
+      </p>
+
+      <div style={{
+        background: 'white',
+        borderRadius: '8px',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        padding: '16px'
+      }}>
+        <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>
+          All Compliance Items
+        </h2>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {items.map((item) => (
+            <li
+              key={item.id}
+              style={{
+                padding: '12px',
+                borderBottom: '1px solid #e5e7eb',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}
+            >
+              <span>{item.name}</span>
+              <span style={{
+                padding: '4px 8px',
+                borderRadius: '4px',
+                fontSize: '12px',
+                background: item.status === 'compliant' ? '#dcfce7' :
+                           item.status === 'expiring' ? '#fef9c3' : '#fee2e2',
+                color: item.status === 'compliant' ? '#166534' :
+                       item.status === 'expiring' ? '#854d0e' : '#991b1b'
+              }}>
+                {item.status}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
-
-      {/* Summary Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
-              <Shield className="h-8 w-8 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-3xl font-bold text-gray-900">{complianceRate}%</h2>
-              <p className="text-gray-600">Overall Compliance Rate</p>
-            </div>
-            <div className="ml-auto flex gap-6">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">{compliantCount}</p>
-                <p className="text-sm text-gray-500">Compliant</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-red-600">{issueCount}</p>
-                <p className="text-sm text-gray-500">Need Attention</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Items List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>All Compliance Items</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="divide-y">
-            {complianceItems.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-4 hover:bg-gray-50">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(item.status)}
-                  <div>
-                    <p className="font-medium text-gray-900">{item.name}</p>
-                    <p className="text-sm text-gray-500">{item.category}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {getStatusBadge(item.status)}
-                  <Button variant="secondary" size="sm">
-                    Update
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
