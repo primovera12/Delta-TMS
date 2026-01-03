@@ -26,7 +26,14 @@
       "Bash(dir \"c:\\\\Users\\\\USER\\\\Desktop\\\\websites\\\\1 LIVE\\\\Delta TMS\\\\Project\\\\Delta-TMS\\\\app\\\\\\(dashboard\\)\\\\driver\\\\trips\\\\[id]\"\" 2>&1 || echo \"not found \")",
       "Bash(npx tsc --noEmit)",
       "Bash(timeout 20 npm run dev:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run lint)",
+      "Bash(ls:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(done)"
     ]
   }
 }

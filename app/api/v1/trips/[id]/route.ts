@@ -1,68 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-
-// Mock trip data
-const trips: Record<string, unknown> = {
-  'TR-20260115-001': {
-    id: 'TR-20260115-001',
-    patientId: 'PAT-001',
-    patientName: 'John Smith',
-    patientPhone: '(555) 123-4567',
-    driverId: 'DRV-001',
-    driverName: 'Mike Johnson',
-    driverPhone: '(555) 987-6543',
-    vehicleId: 'VEH-001',
-    vehiclePlate: 'ABC-1234',
-    vehicleType: 'wheelchair',
-    status: 'in-progress',
-    tripType: 'outbound',
-    pickup: {
-      address: '123 Main St, Houston, TX 77001',
-      lat: 29.7604,
-      lng: -95.3698,
-      scheduledTime: '2026-01-15T10:30:00Z',
-      actualTime: '2026-01-15T10:32:00Z',
-      instructions: 'Ring doorbell, wait for aide',
-    },
-    dropoff: {
-      address: 'Memorial Hospital, 6400 Fannin St, Houston, TX 77030',
-      lat: 29.7108,
-      lng: -95.3978,
-      scheduledTime: '2026-01-15T11:00:00Z',
-      actualTime: null,
-      instructions: 'Emergency entrance',
-    },
-    specialNeeds: ['wheelchair', 'oxygen'],
-    fare: 85.5,
-    distance: 12.5,
-    estimatedDuration: 25,
-    appointmentTime: '2026-01-15T11:30:00Z',
-    facility: {
-      name: 'Memorial Hospital',
-      department: 'Cardiology',
-      phone: '(713) 555-0100',
-    },
-    signatures: {
-      pickup: null,
-      dropoff: null,
-    },
-    mileage: {
-      start: 45230,
-      end: null,
-    },
-    notes: '',
-    timeline: [
-      { status: 'pending', timestamp: '2026-01-14T14:00:00Z', actor: 'System' },
-      { status: 'confirmed', timestamp: '2026-01-14T14:05:00Z', actor: 'Dispatcher' },
-      { status: 'assigned', timestamp: '2026-01-14T16:00:00Z', actor: 'Dispatcher' },
-      { status: 'driver_en_route', timestamp: '2026-01-15T10:15:00Z', actor: 'Driver' },
-      { status: 'arrived_pickup', timestamp: '2026-01-15T10:32:00Z', actor: 'Driver' },
-      { status: 'patient_onboard', timestamp: '2026-01-15T10:40:00Z', actor: 'Driver' },
-    ],
-    createdAt: '2026-01-14T14:00:00Z',
-    updatedAt: '2026-01-15T10:40:00Z',
-  },
-};
+import { prisma } from '@/lib/db';
+import { TripStatus } from '@prisma/client';
 
 // GET /api/v1/trips/[id] - Get trip details
 export async function GET(
@@ -76,13 +15,157 @@ export async function GET(
     }
 
     const { id } = await params;
-    const trip = trips[id];
+
+    const trip = await prisma.trip.findUnique({
+      where: { id },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        vehicle: {
+          select: {
+            id: true,
+            make: true,
+            model: true,
+            licensePlate: true,
+            vehicleType: true,
+          },
+        },
+        passengers: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                phone: true,
+              },
+            },
+          },
+        },
+        facility: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        bookedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        statusHistory: {
+          orderBy: {
+            timestamp: 'asc',
+          },
+          include: {
+            changedBy: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        stops: {
+          orderBy: {
+            stopOrder: 'asc',
+          },
+        },
+      },
+    });
 
     if (!trip) {
       return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ data: trip });
+    const primaryPassenger = trip.passengers.find((p) => p.isPrimary);
+
+    // Transform for frontend
+    const transformedTrip = {
+      id: trip.id,
+      tripNumber: trip.tripNumber,
+      patientId: primaryPassenger?.userId || null,
+      patientName: primaryPassenger
+        ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
+        : 'Unknown',
+      patientPhone: primaryPassenger?.user.phone || null,
+      driverId: trip.driverId,
+      driverName: trip.driver
+        ? `${trip.driver.user.firstName} ${trip.driver.user.lastName}`
+        : null,
+      driverPhone: trip.driver?.user.phone || null,
+      vehicleId: trip.vehicleId,
+      vehiclePlate: trip.vehicle?.licensePlate || null,
+      vehicleType: trip.vehicleType.toLowerCase().replace(/_/g, '-'),
+      status: trip.status.toLowerCase().replace(/_/g, '-'),
+      tripType: trip.tripType.toLowerCase(),
+      pickup: {
+        address: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState} ${trip.pickupZipCode}`,
+        lat: trip.pickupLatitude,
+        lng: trip.pickupLongitude,
+        scheduledTime: trip.scheduledPickupTime.toISOString(),
+        actualTime: trip.actualPickupTime?.toISOString() || null,
+        instructions: trip.bookingNotes || null,
+      },
+      dropoff: {
+        address: `${trip.dropoffAddressLine1}, ${trip.dropoffCity}, ${trip.dropoffState} ${trip.dropoffZipCode}`,
+        lat: trip.dropoffLatitude,
+        lng: trip.dropoffLongitude,
+        scheduledTime: trip.lastDropoffTime?.toISOString() || null,
+        actualTime: trip.actualDropoffTime?.toISOString() || null,
+        instructions: trip.driverNotes || null,
+      },
+      specialNeeds: [
+        trip.wheelchairRequired && 'wheelchair',
+        trip.stretcherRequired && 'stretcher',
+        trip.oxygenRequired && 'oxygen',
+        trip.bariatricRequired && 'bariatric',
+      ].filter(Boolean),
+      fare: trip.totalFare,
+      distance: trip.totalDistanceMiles,
+      estimatedDuration: trip.estimatedDurationMinutes,
+      appointmentTime: trip.appointmentTime?.toISOString() || null,
+      facility: trip.facility ? {
+        name: trip.facility.name,
+        phone: trip.facility.phone,
+      } : null,
+      signatures: {
+        pickup: trip.signatureUrl ? { url: trip.signatureUrl, name: trip.signatureName } : null,
+        dropoff: null,
+      },
+      notes: trip.dispatcherNotes || '',
+      timeline: trip.statusHistory.map((h) => ({
+        status: h.status.toLowerCase().replace(/_/g, '-'),
+        timestamp: h.timestamp.toISOString(),
+        actor: h.changedBy ? `${h.changedBy.firstName} ${h.changedBy.lastName}` : 'System',
+        notes: h.notes || null,
+      })),
+      stops: trip.stops.map((s) => ({
+        order: s.stopOrder,
+        type: s.stopType.toLowerCase(),
+        address: `${s.addressLine1}, ${s.city}, ${s.state} ${s.zipCode}`,
+        lat: s.latitude,
+        lng: s.longitude,
+        scheduledTime: s.scheduledArrival?.toISOString() || null,
+        actualTime: s.actualArrival?.toISOString() || null,
+      })),
+      createdAt: trip.createdAt.toISOString(),
+      updatedAt: trip.updatedAt.toISOString(),
+    };
+
+    return NextResponse.json({ data: transformedTrip });
   } catch (error) {
     console.error('Error fetching trip:', error);
     return NextResponse.json(
@@ -104,49 +187,98 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const trip = trips[id];
+    const body = await request.json();
 
-    if (!trip) {
+    // Check if trip exists
+    const existingTrip = await prisma.trip.findUnique({
+      where: { id },
+    });
+
+    if (!existingTrip) {
       return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
     }
 
-    const body = await request.json();
+    // Build update data
+    const updateData: Record<string, unknown> = {};
 
-    // Update allowed fields
-    const allowedFields = [
-      'status',
-      'driverId',
-      'vehicleId',
-      'pickupInstructions',
-      'dropoffInstructions',
-      'notes',
-      'specialNeeds',
-    ];
-
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        if (field === 'pickupInstructions') {
-          trip.pickup.instructions = body[field];
-        } else if (field === 'dropoffInstructions') {
-          trip.dropoff.instructions = body[field];
-        } else {
-          trip[field] = body[field];
-        }
-      }
+    if (body.driverId !== undefined) {
+      updateData.driverId = body.driverId;
+    }
+    if (body.vehicleId !== undefined) {
+      updateData.vehicleId = body.vehicleId;
+    }
+    if (body.notes !== undefined) {
+      updateData.dispatcherNotes = body.notes;
+    }
+    if (body.bookingNotes !== undefined) {
+      updateData.bookingNotes = body.bookingNotes;
+    }
+    if (body.driverNotes !== undefined) {
+      updateData.driverNotes = body.driverNotes;
     }
 
-    trip.updatedAt = new Date().toISOString();
-
-    // Add to timeline if status changed
+    // Handle status change
     if (body.status) {
-      trip.timeline.push({
-        status: body.status,
-        timestamp: new Date().toISOString(),
-        actor: session.user.name || 'User',
+      const newStatus = body.status.toUpperCase().replace(/-/g, '_') as TripStatus;
+      updateData.status = newStatus;
+
+      // Create status history entry
+      await prisma.tripStatusHistory.create({
+        data: {
+          tripId: id,
+          status: newStatus,
+          previousStatus: existingTrip.status,
+          changedById: session.user.id,
+          notes: body.statusNotes || null,
+        },
       });
     }
 
-    return NextResponse.json({ data: trip });
+    const updatedTrip = await prisma.trip.update({
+      where: { id },
+      data: updateData,
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+        passengers: {
+          where: { isPrimary: true },
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const primaryPassenger = updatedTrip.passengers[0];
+
+    return NextResponse.json({
+      data: {
+        id: updatedTrip.id,
+        tripNumber: updatedTrip.tripNumber,
+        status: updatedTrip.status.toLowerCase().replace(/_/g, '-'),
+        driverId: updatedTrip.driverId,
+        driverName: updatedTrip.driver
+          ? `${updatedTrip.driver.user.firstName} ${updatedTrip.driver.user.lastName}`
+          : null,
+        patientName: primaryPassenger
+          ? `${primaryPassenger.user.firstName} ${primaryPassenger.user.lastName}`
+          : 'Unknown',
+        updatedAt: updatedTrip.updatedAt.toISOString(),
+      },
+    });
   } catch (error) {
     console.error('Error updating trip:', error);
     return NextResponse.json(
@@ -168,29 +300,53 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    const trip = trips[id];
+
+    const trip = await prisma.trip.findUnique({
+      where: { id },
+    });
 
     if (!trip) {
       return NextResponse.json({ error: 'Trip not found' }, { status: 404 });
     }
 
     // Can only cancel if not already in progress or completed
-    if (['in-progress', 'completed'].includes(trip.status)) {
+    const nonCancellableStatuses = [TripStatus.IN_PROGRESS, TripStatus.COMPLETED];
+    if (nonCancellableStatuses.includes(trip.status)) {
       return NextResponse.json(
         { error: 'Cannot cancel a trip that is in progress or completed' },
         { status: 400 }
       );
     }
 
-    trip.status = 'cancelled';
-    trip.updatedAt = new Date().toISOString();
-    trip.timeline.push({
-      status: 'cancelled',
-      timestamp: new Date().toISOString(),
-      actor: session.user.name || 'User',
+    // Update trip status to cancelled
+    const updatedTrip = await prisma.trip.update({
+      where: { id },
+      data: {
+        status: TripStatus.CANCELLED,
+        cancelledAt: new Date(),
+        cancelledById: session.user.id,
+      },
     });
 
-    return NextResponse.json({ data: trip });
+    // Create status history entry
+    await prisma.tripStatusHistory.create({
+      data: {
+        tripId: id,
+        status: TripStatus.CANCELLED,
+        previousStatus: trip.status,
+        changedById: session.user.id,
+        notes: 'Trip cancelled',
+      },
+    });
+
+    return NextResponse.json({
+      data: {
+        id: updatedTrip.id,
+        tripNumber: updatedTrip.tripNumber,
+        status: 'cancelled',
+        cancelledAt: updatedTrip.cancelledAt?.toISOString(),
+      },
+    });
   } catch (error) {
     console.error('Error cancelling trip:', error);
     return NextResponse.json(

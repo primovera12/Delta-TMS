@@ -1,131 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-
-// Mock vehicles data
-const vehicles = [
-  {
-    id: 'VEH-001',
-    make: 'Toyota',
-    model: 'Sienna',
-    year: 2022,
-    licensePlate: 'ABC-1234',
-    vin: '1HGBH41JXMN109186',
-    type: 'wheelchair',
-    capacity: 2,
-    status: 'active',
-    assignedDriverId: 'DRV-001',
-    assignedDriverName: 'John Smith',
-    mileage: 45230,
-    fuelType: 'gasoline',
-    lastInspection: '2025-12-15',
-    nextMaintenance: '2026-02-15',
-    insuranceExpiry: '2026-06-30',
-    registrationExpiry: '2026-04-15',
-    features: ['wheelchair_ramp', 'oxygen_ready', 'gps'],
-    currentLocation: {
-      lat: 29.7604,
-      lng: -95.3698,
-      updatedAt: '2026-01-15T10:30:00Z',
-    },
-    createdAt: '2024-06-01T00:00:00Z',
-  },
-  {
-    id: 'VEH-002',
-    make: 'Ford',
-    model: 'Transit',
-    year: 2023,
-    licensePlate: 'DEF-5678',
-    vin: '2HGBH41JXMN109187',
-    type: 'stretcher',
-    capacity: 1,
-    status: 'active',
-    assignedDriverId: 'DRV-002',
-    assignedDriverName: 'Mike Johnson',
-    mileage: 28450,
-    fuelType: 'gasoline',
-    lastInspection: '2026-01-05',
-    nextMaintenance: '2026-03-05',
-    insuranceExpiry: '2026-08-15',
-    registrationExpiry: '2026-05-20',
-    features: ['stretcher_mount', 'medical_equipment', 'gps'],
-    currentLocation: {
-      lat: 29.7555,
-      lng: -95.3555,
-      updatedAt: '2026-01-15T10:35:00Z',
-    },
-    createdAt: '2024-09-15T00:00:00Z',
-  },
-  {
-    id: 'VEH-003',
-    make: 'Dodge',
-    model: 'Grand Caravan',
-    year: 2021,
-    licensePlate: 'GHI-9012',
-    vin: '3HGBH41JXMN109188',
-    type: 'ambulatory',
-    capacity: 4,
-    status: 'maintenance',
-    assignedDriverId: null,
-    assignedDriverName: null,
-    mileage: 62180,
-    fuelType: 'gasoline',
-    lastInspection: '2025-11-20',
-    nextMaintenance: '2026-01-20',
-    insuranceExpiry: '2026-05-10',
-    registrationExpiry: '2026-03-25',
-    features: ['gps'],
-    currentLocation: null,
-    createdAt: '2024-03-10T00:00:00Z',
-  },
-  {
-    id: 'VEH-004',
-    make: 'Toyota',
-    model: 'Sienna',
-    year: 2024,
-    licensePlate: 'JKL-3456',
-    vin: '4HGBH41JXMN109189',
-    type: 'wheelchair',
-    capacity: 2,
-    status: 'active',
-    assignedDriverId: 'DRV-003',
-    assignedDriverName: 'Sarah Williams',
-    mileage: 12450,
-    fuelType: 'hybrid',
-    lastInspection: '2026-01-10',
-    nextMaintenance: '2026-04-10',
-    insuranceExpiry: '2026-12-01',
-    registrationExpiry: '2026-11-15',
-    features: ['wheelchair_ramp', 'oxygen_ready', 'gps', 'backup_camera'],
-    currentLocation: {
-      lat: 29.7508,
-      lng: -95.4608,
-      updatedAt: '2026-01-15T10:28:00Z',
-    },
-    createdAt: '2024-11-01T00:00:00Z',
-  },
-  {
-    id: 'VEH-005',
-    make: 'Mercedes',
-    model: 'Sprinter',
-    year: 2022,
-    licensePlate: 'MNO-7890',
-    vin: '5HGBH41JXMN109190',
-    type: 'bariatric',
-    capacity: 1,
-    status: 'inactive',
-    assignedDriverId: null,
-    assignedDriverName: null,
-    mileage: 38920,
-    fuelType: 'diesel',
-    lastInspection: '2025-10-05',
-    nextMaintenance: '2026-01-05',
-    insuranceExpiry: '2026-04-20',
-    registrationExpiry: '2026-02-28',
-    features: ['bariatric_lift', 'reinforced_floor', 'gps'],
-    currentLocation: null,
-    createdAt: '2024-05-20T00:00:00Z',
-  },
-];
+import { prisma } from '@/lib/db';
+import { VehicleType } from '@prisma/client';
 
 // GET /api/v1/vehicles - List vehicles
 export async function GET(request: NextRequest) {
@@ -136,46 +12,108 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = searchParams.get('type');
     const status = searchParams.get('status');
-    const search = searchParams.get('search');
+    const type = searchParams.get('type');
     const available = searchParams.get('available');
+    const search = searchParams.get('search');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    let filteredVehicles = [...vehicles];
+    // Build where clause
+    const where: Record<string, unknown> = {};
 
-    // Apply filters
+    if (status === 'active') {
+      where.isActive = true;
+      where.isInService = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    } else if (status === 'maintenance') {
+      where.isInService = false;
+      where.isActive = true;
+    }
+
     if (type) {
-      filteredVehicles = filteredVehicles.filter((v) => v.type === type);
-    }
-    if (status) {
-      filteredVehicles = filteredVehicles.filter((v) => v.status === status);
-    }
-    if (available === 'true') {
-      filteredVehicles = filteredVehicles.filter(
-        (v) => v.status === 'active' && !v.assignedDriverId
-      );
-    }
-    if (search) {
-      const searchLower = search.toLowerCase();
-      filteredVehicles = filteredVehicles.filter(
-        (v) =>
-          v.licensePlate.toLowerCase().includes(searchLower) ||
-          v.make.toLowerCase().includes(searchLower) ||
-          v.model.toLowerCase().includes(searchLower) ||
-          (v.assignedDriverName?.toLowerCase().includes(searchLower) ?? false)
-      );
+      where.vehicleType = type.toUpperCase().replace(/-/g, '_') as VehicleType;
     }
 
-    // Pagination
-    const total = filteredVehicles.length;
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const paginatedVehicles = filteredVehicles.slice(start, end);
+    if (available === 'true') {
+      where.driverId = null;
+      where.isActive = true;
+      where.isInService = true;
+    }
+
+    if (search) {
+      where.OR = [
+        { make: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
+        { licensePlate: { contains: search, mode: 'insensitive' } },
+        { vin: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [vehicles, total] = await Promise.all([
+      prisma.vehicle.findMany({
+        where,
+        include: {
+          driver: {
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.vehicle.count({ where }),
+    ]);
+
+    // Transform for frontend
+    const transformedVehicles = vehicles.map((vehicle) => ({
+      id: vehicle.id,
+      make: vehicle.make,
+      model: vehicle.model,
+      year: vehicle.year,
+      color: vehicle.color,
+      licensePlate: vehicle.licensePlate,
+      vin: vehicle.vin,
+      type: vehicle.vehicleType.toLowerCase().replace(/_/g, '-'),
+      capacity: vehicle.seatingCapacity,
+      wheelchairCapacity: vehicle.wheelchairCapacity,
+      stretcherCapacity: vehicle.stretcherCapacity,
+      status: vehicle.isActive && vehicle.isInService ? 'active' :
+              !vehicle.isActive ? 'inactive' : 'maintenance',
+      assignedDriverId: vehicle.driverId,
+      assignedDriverName: vehicle.driver
+        ? `${vehicle.driver.user.firstName} ${vehicle.driver.user.lastName}`
+        : null,
+      mileage: vehicle.currentMileage,
+      lastInspection: vehicle.inspectionExpiry?.toISOString().split('T')[0] || null,
+      nextMaintenance: vehicle.nextMaintenanceDue?.toISOString().split('T')[0] || null,
+      insuranceExpiry: vehicle.insuranceExpiry.toISOString().split('T')[0],
+      registrationExpiry: vehicle.registrationExpiry.toISOString().split('T')[0],
+      features: [
+        vehicle.wheelchairAccessible && 'wheelchair_accessible',
+        vehicle.stretcherCapable && 'stretcher_capable',
+        vehicle.oxygenEquipped && 'oxygen_equipped',
+        vehicle.hasLift && 'lift',
+        vehicle.hasRamp && 'ramp',
+        vehicle.hasGPS && 'gps',
+        vehicle.hasDashcam && 'dashcam',
+      ].filter(Boolean),
+      createdAt: vehicle.createdAt.toISOString(),
+      updatedAt: vehicle.updatedAt.toISOString(),
+    }));
 
     return NextResponse.json({
-      data: paginatedVehicles,
+      data: transformedVehicles,
       pagination: {
         page,
         limit,
@@ -203,7 +141,12 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate required fields
-    const requiredFields = ['make', 'model', 'year', 'licensePlate', 'vin', 'type'];
+    const requiredFields = [
+      'make', 'model', 'year', 'licensePlate', 'vin', 'vehicleType',
+      'seatingCapacity', 'insuranceProvider', 'insurancePolicyNumber',
+      'insuranceExpiry', 'registrationState', 'registrationExpiry', 'inspectionExpiry'
+    ];
+
     for (const field of requiredFields) {
       if (!body[field]) {
         return NextResponse.json(
@@ -214,47 +157,115 @@ export async function POST(request: NextRequest) {
     }
 
     // Check for duplicate license plate or VIN
-    if (vehicles.some((v) => v.licensePlate === body.licensePlate)) {
+    const existing = await prisma.vehicle.findFirst({
+      where: {
+        OR: [
+          { licensePlate: body.licensePlate },
+          { vin: body.vin },
+        ],
+      },
+    });
+
+    if (existing) {
       return NextResponse.json(
-        { error: 'License plate already exists' },
+        { error: 'Vehicle with this license plate or VIN already exists' },
         { status: 400 }
       );
     }
-    if (vehicles.some((v) => v.vin === body.vin)) {
-      return NextResponse.json(
-        { error: 'VIN already exists' },
-        { status: 400 }
-      );
-    }
 
-    const newVehicle = {
-      id: `VEH-${String(vehicles.length + 1).padStart(3, '0')}`,
-      make: body.make,
-      model: body.model,
-      year: body.year,
-      licensePlate: body.licensePlate,
-      vin: body.vin,
-      type: body.type,
-      capacity: body.capacity || 1,
-      status: 'active',
-      assignedDriverId: null,
-      assignedDriverName: null,
-      mileage: body.mileage || 0,
-      fuelType: body.fuelType || 'gasoline',
-      lastInspection: null,
-      nextMaintenance: null,
-      insuranceExpiry: body.insuranceExpiry || null,
-      registrationExpiry: body.registrationExpiry || null,
-      features: body.features || [],
-      currentLocation: null,
-      createdAt: new Date().toISOString(),
-    };
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        make: body.make,
+        model: body.model,
+        year: parseInt(body.year),
+        color: body.color || 'Unknown',
+        licensePlate: body.licensePlate,
+        vin: body.vin,
+        vehicleType: body.vehicleType.toUpperCase().replace(/-/g, '_') as VehicleType,
+        seatingCapacity: parseInt(body.seatingCapacity),
+        wheelchairCapacity: parseInt(body.wheelchairCapacity) || 1,
+        stretcherCapacity: parseInt(body.stretcherCapacity) || 0,
+        maxWeightCapacity: body.maxWeightCapacity ? parseInt(body.maxWeightCapacity) : null,
+        wheelchairAccessible: body.wheelchairAccessible ?? true,
+        stretcherCapable: body.stretcherCapable ?? false,
+        oxygenEquipped: body.oxygenEquipped ?? false,
+        hasLift: body.hasLift ?? false,
+        hasRamp: body.hasRamp ?? false,
+        hasGPS: body.hasGPS ?? true,
+        hasDashcam: body.hasDashcam ?? false,
+        insuranceProvider: body.insuranceProvider,
+        insurancePolicyNumber: body.insurancePolicyNumber,
+        insuranceExpiry: new Date(body.insuranceExpiry),
+        registrationState: body.registrationState,
+        registrationExpiry: new Date(body.registrationExpiry),
+        inspectionExpiry: new Date(body.inspectionExpiry),
+        currentMileage: body.mileage ? parseInt(body.mileage) : null,
+        notes: body.notes || null,
+        isActive: true,
+        isInService: true,
+      },
+    });
 
-    vehicles.push(newVehicle);
-
-    return NextResponse.json({ data: newVehicle }, { status: 201 });
+    return NextResponse.json({
+      data: {
+        id: vehicle.id,
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        licensePlate: vehicle.licensePlate,
+        type: vehicle.vehicleType.toLowerCase().replace(/_/g, '-'),
+        status: 'active',
+        createdAt: vehicle.createdAt.toISOString(),
+      },
+    }, { status: 201 });
   } catch (error) {
     console.error('Error creating vehicle:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// PATCH /api/v1/vehicles - Bulk update vehicles
+export async function PATCH(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { vehicleIds, update } = body;
+
+    if (!vehicleIds || !Array.isArray(vehicleIds) || vehicleIds.length === 0) {
+      return NextResponse.json(
+        { error: 'vehicleIds array is required' },
+        { status: 400 }
+      );
+    }
+
+    // Build update data
+    const updateData: Record<string, unknown> = {};
+
+    if (update.isActive !== undefined) updateData.isActive = update.isActive;
+    if (update.isInService !== undefined) updateData.isInService = update.isInService;
+    if (update.driverId !== undefined) updateData.driverId = update.driverId;
+
+    const result = await prisma.vehicle.updateMany({
+      where: {
+        id: { in: vehicleIds },
+      },
+      data: updateData,
+    });
+
+    return NextResponse.json({
+      data: {
+        updated: result.count,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating vehicles:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
