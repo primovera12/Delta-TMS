@@ -1,142 +1,155 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { InvoiceStatus } from '@prisma/client';
 
-// Mock invoices data
-const invoices = [
-  {
-    id: 'INV-2026-0115',
-    facilityId: 'FAC-001',
-    facilityName: 'Memorial Hospital',
-    amount: 4250.00,
-    trips: 45,
-    period: { start: '2026-01-01', end: '2026-01-15' },
-    issueDate: '2026-01-15',
-    dueDate: '2026-01-30',
-    status: 'pending',
-    createdAt: '2026-01-15T09:00:00Z',
-    updatedAt: '2026-01-15T09:00:00Z',
-  },
-  {
-    id: 'INV-2026-0114',
-    facilityId: 'FAC-002',
-    facilityName: 'City Dialysis Center',
-    amount: 8750.00,
-    trips: 120,
-    period: { start: '2026-01-01', end: '2026-01-15' },
-    issueDate: '2026-01-15',
-    dueDate: '2026-01-30',
-    status: 'pending',
-    createdAt: '2026-01-15T09:00:00Z',
-    updatedAt: '2026-01-15T09:00:00Z',
-  },
-  {
-    id: 'INV-2026-0108',
-    facilityId: 'FAC-003',
-    facilityName: 'Regional Medical Center',
-    amount: 3200.00,
-    trips: 38,
-    period: { start: '2025-12-16', end: '2025-12-31' },
-    issueDate: '2026-01-01',
-    dueDate: '2026-01-15',
-    status: 'overdue',
-    createdAt: '2026-01-01T09:00:00Z',
-    updatedAt: '2026-01-16T09:00:00Z',
-  },
-];
-
+// GET /api/v1/invoices - List invoices
 export async function GET(request: NextRequest) {
-  // Authentication check
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Authorization - only allow admin, operations, and billing roles
-  const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'BILLING'];
-  if (!allowedRoles.includes(session.user.role as string)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+    const facilityId = searchParams.get('facilityId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-  const { searchParams } = new URL(request.url);
+    // Build where clause
+    const where: Record<string, unknown> = {};
 
-  // Filter parameters
-  const status = searchParams.get('status');
-  const facilityId = searchParams.get('facilityId');
-  const startDate = searchParams.get('startDate');
-  const endDate = searchParams.get('endDate');
+    if (status) {
+      where.status = status.toUpperCase() as InvoiceStatus;
+    }
 
-  // Pagination
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
+    if (facilityId) {
+      where.facilityId = facilityId;
+    }
 
-  let filteredInvoices = [...invoices];
+    if (startDate || endDate) {
+      where.periodStart = {};
+      if (startDate) {
+        (where.periodStart as Record<string, Date>).gte = new Date(startDate);
+      }
+      if (endDate) {
+        (where.periodStart as Record<string, Date>).lte = new Date(endDate);
+      }
+    }
 
-  // Apply filters
-  if (status) {
-    filteredInvoices = filteredInvoices.filter((invoice) => invoice.status === status);
-  }
+    const [invoices, total, stats] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: {
+          facility: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          payments: {
+            select: {
+              id: true,
+              amount: true,
+              paidAt: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.invoice.count({ where }),
+      // Get summary stats
+      prisma.invoice.aggregate({
+        where: {
+          status: { not: InvoiceStatus.PAID },
+        },
+        _sum: {
+          amountDue: true,
+        },
+      }),
+    ]);
 
-  if (facilityId) {
-    filteredInvoices = filteredInvoices.filter((invoice) => invoice.facilityId === facilityId);
-  }
+    // Get overdue stats separately
+    const overdueStats = await prisma.invoice.aggregate({
+      where: {
+        status: InvoiceStatus.OVERDUE,
+      },
+      _sum: {
+        amountDue: true,
+      },
+      _count: true,
+    });
 
-  if (startDate) {
-    filteredInvoices = filteredInvoices.filter(
-      (invoice) => new Date(invoice.issueDate) >= new Date(startDate)
+    const pendingCount = await prisma.invoice.count({
+      where: { status: InvoiceStatus.PENDING },
+    });
+
+    // Transform for frontend
+    const transformedInvoices = invoices.map((invoice) => ({
+      id: invoice.id,
+      invoiceNumber: invoice.invoiceNumber,
+      facilityId: invoice.facilityId,
+      facilityName: invoice.facility.name,
+      amount: invoice.totalAmount,
+      amountPaid: invoice.amountPaid,
+      amountDue: invoice.amountDue,
+      trips: invoice.tripCount,
+      period: {
+        start: invoice.periodStart.toISOString().split('T')[0],
+        end: invoice.periodEnd.toISOString().split('T')[0],
+      },
+      issueDate: invoice.createdAt.toISOString().split('T')[0],
+      dueDate: invoice.dueDate.toISOString().split('T')[0],
+      status: invoice.status.toLowerCase(),
+      sentAt: invoice.sentAt?.toISOString() || null,
+      paidAt: invoice.paidAt?.toISOString() || null,
+      payments: invoice.payments,
+      createdAt: invoice.createdAt.toISOString(),
+      updatedAt: invoice.updatedAt.toISOString(),
+    }));
+
+    const summary = {
+      totalOutstanding: stats._sum.amountDue || 0,
+      totalOverdue: overdueStats._sum.amountDue || 0,
+      totalPending: pendingCount,
+      totalOverdueCount: overdueStats._count || 0,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: transformedInvoices,
+      summary,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
     );
   }
-
-  if (endDate) {
-    filteredInvoices = filteredInvoices.filter(
-      (invoice) => new Date(invoice.issueDate) <= new Date(endDate)
-    );
-  }
-
-  // Calculate pagination
-  const total = filteredInvoices.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const paginatedInvoices = filteredInvoices.slice(offset, offset + limit);
-
-  // Calculate summary stats
-  const summary = {
-    totalOutstanding: filteredInvoices
-      .filter((i) => i.status !== 'paid')
-      .reduce((sum, i) => sum + i.amount, 0),
-    totalOverdue: filteredInvoices
-      .filter((i) => i.status === 'overdue')
-      .reduce((sum, i) => sum + i.amount, 0),
-    totalPending: filteredInvoices.filter((i) => i.status === 'pending').length,
-    totalOverdueCount: filteredInvoices.filter((i) => i.status === 'overdue').length,
-  };
-
-  return NextResponse.json({
-    success: true,
-    data: paginatedInvoices,
-    summary,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages,
-    },
-  });
 }
 
+// POST /api/v1/invoices - Create a new invoice
 export async function POST(request: NextRequest) {
-  // Authentication check
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Authorization - only allow admin, operations, and billing roles
-  const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'BILLING'];
-  if (!allowedRoles.includes(session.user.role as string)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
@@ -145,83 +158,125 @@ export async function POST(request: NextRequest) {
       periodEnd,
       tripIds,
       dueDate,
-      paymentTerms,
       notes,
     } = body;
 
     // Validate required fields
-    if (!facilityId || !periodStart || !periodEnd || !tripIds?.length) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: facilityId, periodStart, periodEnd, tripIds',
-        },
-        { status: 400 }
-      );
+    if (!facilityId || !periodStart || !periodEnd) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: facilityId, periodStart, periodEnd',
+      }, { status: 400 });
     }
 
-    // Generate invoice ID
+    // Fetch facility to get payment terms
+    const facility = await prisma.facility.findUnique({
+      where: { id: facilityId },
+    });
+
+    if (!facility) {
+      return NextResponse.json({
+        success: false,
+        error: 'Facility not found',
+      }, { status: 404 });
+    }
+
+    // Calculate trips in period (or use provided tripIds)
+    const tripsWhere = tripIds?.length > 0
+      ? { id: { in: tripIds } }
+      : {
+          facilityId,
+          scheduledPickupTime: {
+            gte: new Date(periodStart),
+            lte: new Date(periodEnd),
+          },
+          status: 'COMPLETED',
+        };
+
+    const trips = await prisma.trip.findMany({
+      where: tripsWhere,
+      select: {
+        id: true,
+        tripNumber: true,
+        totalFare: true,
+        scheduledPickupTime: true,
+      },
+    });
+
+    const subtotal = trips.reduce((sum, t) => sum + t.totalFare, 0);
+    const totalAmount = subtotal; // No tax for now
+    const amountDue = totalAmount;
+
+    // Generate invoice number
     const today = new Date();
-    const invoiceId = `INV-${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+    const year = today.getFullYear();
+    const count = await prisma.invoice.count({
+      where: {
+        invoiceNumber: {
+          startsWith: `INV-${year}`,
+        },
+      },
+    });
+    const invoiceNumber = `INV-${year}-${String(count + 1).padStart(5, '0')}`;
 
-    // Mock calculation - in real app, would fetch trips and calculate
-    const mockAmount = tripIds.length * 85; // Average $85 per trip
+    // Calculate due date
+    const calculatedDueDate = dueDate
+      ? new Date(dueDate)
+      : new Date(today.getTime() + facility.paymentTermDays * 24 * 60 * 60 * 1000);
 
-    const newInvoice = {
-      id: invoiceId,
-      facilityId,
-      facilityName: 'Mock Facility', // Would be fetched from facility
-      amount: mockAmount,
-      trips: tripIds.length,
-      period: { start: periodStart, end: periodEnd },
-      issueDate: today.toISOString().split('T')[0],
-      dueDate: dueDate || calculateDueDate(today, paymentTerms || 'net15'),
-      status: 'pending',
-      paymentTerms: paymentTerms || 'net15',
-      notes,
-      tripIds,
-      createdAt: today.toISOString(),
-      updatedAt: today.toISOString(),
-    };
-
-    // In real app, would save to database
+    const invoice = await prisma.invoice.create({
+      data: {
+        invoiceNumber,
+        facilityId,
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        subtotal,
+        totalAmount,
+        amountDue,
+        tripCount: trips.length,
+        lineItems: trips.map((t) => ({
+          tripId: t.id,
+          tripNumber: t.tripNumber,
+          date: t.scheduledPickupTime.toISOString(),
+          amount: t.totalFare,
+        })),
+        dueDate: calculatedDueDate,
+        status: InvoiceStatus.DRAFT,
+        notes: notes || null,
+      },
+      include: {
+        facility: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      data: newInvoice,
+      data: {
+        id: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        facilityId: invoice.facilityId,
+        facilityName: invoice.facility.name,
+        amount: invoice.totalAmount,
+        trips: invoice.tripCount,
+        period: {
+          start: invoice.periodStart.toISOString().split('T')[0],
+          end: invoice.periodEnd.toISOString().split('T')[0],
+        },
+        dueDate: invoice.dueDate.toISOString().split('T')[0],
+        status: invoice.status.toLowerCase(),
+        createdAt: invoice.createdAt.toISOString(),
+      },
       message: 'Invoice created successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating invoice:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create invoice',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to create invoice',
+    }, { status: 500 });
   }
-}
-
-function calculateDueDate(issueDate: Date, terms: string): string {
-  const dueDate = new Date(issueDate);
-
-  switch (terms) {
-    case 'net15':
-      dueDate.setDate(dueDate.getDate() + 15);
-      break;
-    case 'net30':
-      dueDate.setDate(dueDate.getDate() + 30);
-      break;
-    case 'net45':
-      dueDate.setDate(dueDate.getDate() + 45);
-      break;
-    case 'due-receipt':
-      // Due immediately
-      break;
-    default:
-      dueDate.setDate(dueDate.getDate() + 15);
-  }
-
-  return dueDate.toISOString().split('T')[0];
 }

@@ -1,272 +1,235 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { auth } from '@/lib/auth';
+import { prisma } from '@/lib/db';
+import { FacilityBillingType } from '@prisma/client';
 
-// Mock facilities data
-const facilities = [
-  {
-    id: 'FAC-001',
-    name: 'Memorial Hospital',
-    type: 'hospital',
-    address: '1234 Medical Center Dr',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77001',
-    contact: {
-      name: 'Jane Wilson',
-      email: 'scheduling@memorial.com',
-      phone: '(555) 123-4567',
-    },
-    billing: {
-      email: 'billing@memorial.com',
-      paymentTerms: 'net30',
-    },
-    status: 'active',
-    tripCount: 450,
-    monthlyVolume: 45000,
-    createdAt: '2024-01-15T10:00:00Z',
-  },
-  {
-    id: 'FAC-002',
-    name: 'City Dialysis Center',
-    type: 'dialysis',
-    address: '789 Health Blvd',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77002',
-    contact: {
-      name: 'Mike Roberts',
-      email: 'transport@citydialysis.com',
-      phone: '(555) 234-5678',
-    },
-    billing: {
-      email: 'accounts@citydialysis.com',
-      paymentTerms: 'net15',
-    },
-    status: 'active',
-    tripCount: 520,
-    monthlyVolume: 38000,
-    createdAt: '2024-02-20T14:30:00Z',
-  },
-  {
-    id: 'FAC-003',
-    name: 'Regional Medical Center',
-    type: 'hospital',
-    address: '567 Healthcare Way',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77003',
-    contact: {
-      name: 'Sarah Johnson',
-      email: 'transport@rmc.com',
-      phone: '(555) 345-6789',
-    },
-    billing: {
-      email: 'billing@rmc.com',
-      paymentTerms: 'net30',
-    },
-    status: 'active',
-    tripCount: 280,
-    monthlyVolume: 28000,
-    createdAt: '2024-03-10T09:00:00Z',
-  },
-  {
-    id: 'FAC-004',
-    name: 'Heart Care Clinic',
-    type: 'clinic',
-    address: '890 Cardio Dr',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77004',
-    contact: {
-      name: 'Dr. Lisa Chen',
-      email: 'admin@heartcare.com',
-      phone: '(555) 456-7890',
-    },
-    billing: {
-      email: 'billing@heartcare.com',
-      paymentTerms: 'net15',
-    },
-    status: 'active',
-    tripCount: 180,
-    monthlyVolume: 15000,
-    createdAt: '2024-04-05T11:00:00Z',
-  },
-  {
-    id: 'FAC-005',
-    name: 'Cancer Treatment Center',
-    type: 'specialty',
-    address: '567 Oncology Way',
-    city: 'Houston',
-    state: 'TX',
-    zip: '77005',
-    contact: {
-      name: 'Tom Williams',
-      email: 'scheduling@ctc.com',
-      phone: '(555) 567-8901',
-    },
-    billing: {
-      email: 'billing@ctc.com',
-      paymentTerms: 'net30',
-    },
-    status: 'active',
-    tripCount: 140,
-    monthlyVolume: 18000,
-    createdAt: '2024-05-12T15:30:00Z',
-  },
-];
-
+// GET /api/v1/facilities - List facilities
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-  // Filter parameters
-  const type = searchParams.get('type');
-  const status = searchParams.get('status');
-  const search = searchParams.get('search');
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type');
+    const status = searchParams.get('status');
+    const search = searchParams.get('search');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-  // Pagination
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '20');
+    // Build where clause
+    const where: Record<string, unknown> = {};
 
-  let filteredFacilities = [...facilities];
+    if (type) {
+      where.type = type;
+    }
 
-  // Apply filters
-  if (type) {
-    filteredFacilities = filteredFacilities.filter((f) => f.type === type);
-  }
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    }
 
-  if (status) {
-    filteredFacilities = filteredFacilities.filter((f) => f.status === status);
-  }
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { addressLine1: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
 
-  if (search) {
-    const searchLower = search.toLowerCase();
-    filteredFacilities = filteredFacilities.filter(
-      (f) =>
-        f.name.toLowerCase().includes(searchLower) ||
-        f.address.toLowerCase().includes(searchLower) ||
-        f.city.toLowerCase().includes(searchLower)
-    );
-  }
+    const [facilities, total, tripCounts] = await Promise.all([
+      prisma.facility.findMany({
+        where,
+        include: {
+          staff: {
+            take: 1,
+            include: {
+              user: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  phone: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              trips: true,
+            },
+          },
+        },
+        orderBy: {
+          name: 'asc',
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.facility.count({ where }),
+      // Get summary stats
+      prisma.facility.groupBy({
+        by: ['type'],
+        _count: true,
+      }),
+    ]);
 
-  // Calculate pagination
-  const total = filteredFacilities.length;
-  const totalPages = Math.ceil(total / limit);
-  const offset = (page - 1) * limit;
-  const paginatedFacilities = filteredFacilities.slice(offset, offset + limit);
+    // Transform for frontend
+    const transformedFacilities = facilities.map((facility) => {
+      const primaryContact = facility.staff[0];
+      return {
+        id: facility.id,
+        name: facility.name,
+        type: facility.type,
+        address: facility.addressLine1,
+        addressLine2: facility.addressLine2,
+        city: facility.city,
+        state: facility.state,
+        zip: facility.zipCode,
+        contact: {
+          name: primaryContact
+            ? `${primaryContact.user.firstName} ${primaryContact.user.lastName}`
+            : facility.billingContactName || '',
+          email: primaryContact?.user.email || facility.email || '',
+          phone: primaryContact?.user.phone || facility.phone || '',
+        },
+        billing: {
+          email: facility.billingEmail || '',
+          paymentTerms: `net${facility.paymentTermDays}`,
+        },
+        status: facility.isActive ? 'active' : 'inactive',
+        tripCount: facility._count.trips,
+        entranceInstructions: facility.entranceInstructions,
+        parkingInstructions: facility.parkingInstructions,
+        createdAt: facility.createdAt.toISOString(),
+        updatedAt: facility.updatedAt.toISOString(),
+      };
+    });
 
-  // Summary stats
-  const summary = {
-    totalFacilities: facilities.length,
-    activeFacilities: facilities.filter((f) => f.status === 'active').length,
-    totalTrips: facilities.reduce((sum, f) => sum + f.tripCount, 0),
-    totalMonthlyVolume: facilities.reduce((sum, f) => sum + f.monthlyVolume, 0),
-    byType: {
-      hospital: facilities.filter((f) => f.type === 'hospital').length,
-      dialysis: facilities.filter((f) => f.type === 'dialysis').length,
-      clinic: facilities.filter((f) => f.type === 'clinic').length,
-      specialty: facilities.filter((f) => f.type === 'specialty').length,
-    },
-  };
+    // Calculate summary
+    const typeBreakdown: Record<string, number> = {};
+    tripCounts.forEach((tc) => {
+      typeBreakdown[tc.type] = tc._count;
+    });
 
-  return NextResponse.json(
-    {
+    const summary = {
+      totalFacilities: total,
+      activeFacilities: await prisma.facility.count({ where: { isActive: true } }),
+      byType: typeBreakdown,
+    };
+
+    return NextResponse.json({
       success: true,
-      data: paginatedFacilities,
+      data: transformedFacilities,
       summary,
       pagination: {
         page,
         limit,
         total,
-        totalPages,
+        totalPages: Math.ceil(total / limit),
       },
-    },
-    {
+    }, {
       headers: {
-        // Cache for 5 minutes since facilities rarely change
         'Cache-Control': 'private, max-age=300, stale-while-revalidate=60',
       },
-    }
-  );
+    });
+  } catch (error) {
+    console.error('Error fetching facilities:', error);
+    return NextResponse.json(
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
 }
 
+// POST /api/v1/facilities - Create a new facility
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
 
     const {
       name,
       type,
       address,
+      addressLine2,
       city,
       state,
       zip,
+      phone,
+      email,
       contact,
       billing,
+      entranceInstructions,
+      parkingInstructions,
     } = body;
 
     // Validate required fields
-    if (!name || !type || !address || !city || !state || !zip) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing required fields: name, type, address, city, state, zip',
-        },
-        { status: 400 }
-      );
+    if (!name || !type || !address || !city || !state || !zip || !phone) {
+      return NextResponse.json({
+        success: false,
+        error: 'Missing required fields: name, type, address, city, state, zip, phone',
+      }, { status: 400 });
     }
 
     // Validate facility type
-    const validTypes = ['hospital', 'dialysis', 'clinic', 'specialty', 'nursing_home', 'other'];
+    const validTypes = ['hospital', 'dialysis_center', 'clinic', 'nursing_home', 'rehab', 'other'];
     if (!validTypes.includes(type)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Invalid facility type. Must be one of: ${validTypes.join(', ')}`,
-        },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: `Invalid facility type. Must be one of: ${validTypes.join(', ')}`,
+      }, { status: 400 });
     }
 
-    // Generate facility ID
-    const facilityId = `FAC-${String(facilities.length + 1).padStart(3, '0')}`;
-
-    const newFacility = {
-      id: facilityId,
-      name,
-      type,
-      address,
-      city,
-      state,
-      zip,
-      contact: contact || {
-        name: '',
-        email: '',
-        phone: '',
+    const facility = await prisma.facility.create({
+      data: {
+        name,
+        type,
+        phone,
+        email: email || null,
+        addressLine1: address,
+        addressLine2: addressLine2 || null,
+        city,
+        state,
+        zipCode: zip,
+        entranceInstructions: entranceInstructions || null,
+        parkingInstructions: parkingInstructions || null,
+        billingEmail: billing?.email || null,
+        billingContactName: contact?.name || null,
+        billingContactPhone: contact?.phone || null,
+        paymentTermDays: billing?.paymentTerms === 'net15' ? 15 : 30,
+        billingType: FacilityBillingType.PAY_PER_RIDE,
+        isActive: true,
       },
-      billing: billing || {
-        email: '',
-        paymentTerms: 'net30',
-      },
-      status: 'active',
-      tripCount: 0,
-      monthlyVolume: 0,
-      createdAt: new Date().toISOString(),
-    };
-
-    // In real app, would save to database
+    });
 
     return NextResponse.json({
       success: true,
-      data: newFacility,
+      data: {
+        id: facility.id,
+        name: facility.name,
+        type: facility.type,
+        address: facility.addressLine1,
+        city: facility.city,
+        state: facility.state,
+        zip: facility.zipCode,
+        status: 'active',
+        createdAt: facility.createdAt.toISOString(),
+      },
       message: 'Facility created successfully',
     }, { status: 201 });
   } catch (error) {
     console.error('Error creating facility:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to create facility',
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to create facility',
+    }, { status: 500 });
   }
 }
