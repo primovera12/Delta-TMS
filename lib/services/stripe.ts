@@ -506,7 +506,7 @@ export async function processTriPPayment(
     }
 
     // Calculate amount in cents
-    const amount = Math.round((trip.totalPrice || 0) * 100);
+    const amount = Math.round((trip.totalFare || 0) * 100);
 
     if (amount <= 0) {
       return { success: false, error: 'Invalid payment amount' };

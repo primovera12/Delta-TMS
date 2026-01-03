@@ -94,7 +94,7 @@ async function main() {
 
     // Create driver profile for driver user
     if (userData.role === UserRole.DRIVER) {
-      await prisma.driver.create({
+      await prisma.driverProfile.create({
         data: {
           userId: user.id,
           licenseNumber: 'DL123456789',

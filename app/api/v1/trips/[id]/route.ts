@@ -158,8 +158,8 @@ export async function GET(
         address: `${s.addressLine1}, ${s.city}, ${s.state} ${s.zipCode}`,
         lat: s.latitude,
         lng: s.longitude,
-        scheduledTime: s.scheduledArrival?.toISOString() || null,
-        actualTime: s.actualArrival?.toISOString() || null,
+        scheduledTime: s.scheduledTime?.toISOString() || null,
+        actualTime: s.actualArrivalTime?.toISOString() || null,
       })),
       createdAt: trip.createdAt.toISOString(),
       updatedAt: trip.updatedAt.toISOString(),
@@ -310,8 +310,7 @@ export async function DELETE(
     }
 
     // Can only cancel if not already in progress or completed
-    const nonCancellableStatuses = [TripStatus.IN_PROGRESS, TripStatus.COMPLETED];
-    if (nonCancellableStatuses.includes(trip.status)) {
+    if (trip.status === TripStatus.IN_PROGRESS || trip.status === TripStatus.COMPLETED) {
       return NextResponse.json(
         { error: 'Cannot cancel a trip that is in progress or completed' },
         { status: 400 }

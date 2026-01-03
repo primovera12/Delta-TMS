@@ -130,7 +130,29 @@ export async function PUT(
     }
 
     // Trigger notifications based on status change (non-blocking)
-    sendStatusNotifications(trip, newStatus as TripStatus).catch(err => {
+    const tripForNotification = {
+      id: trip.id,
+      scheduledPickupTime: trip.scheduledPickupTime,
+      pickupAddress: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState} ${trip.pickupZipCode}`,
+      dropoffAddress: `${trip.dropoffAddressLine1}, ${trip.dropoffCity}, ${trip.dropoffState} ${trip.dropoffZipCode}`,
+      driverId: trip.driverId,
+      driver: trip.driver ? {
+        user: {
+          firstName: trip.driver.user.firstName,
+          lastName: trip.driver.user.lastName,
+          phone: trip.driver.user.phone,
+        },
+      } : null,
+      passengers: trip.passengers.map(p => ({
+        isPrimary: p.isPrimary,
+        user: {
+          phone: p.user?.phone || '',
+          firstName: p.user?.firstName || p.firstName,
+          lastName: p.user?.lastName || p.lastName,
+        },
+      })),
+    };
+    sendStatusNotifications(tripForNotification, newStatus as TripStatus).catch(err => {
       console.error('Failed to send status notification:', err);
     });
 
