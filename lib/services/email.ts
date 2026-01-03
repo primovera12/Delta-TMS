@@ -423,11 +423,7 @@ export async function sendInvoiceReminder(
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
-      facility: {
-        include: {
-          billingContact: true,
-        },
-      },
+      facility: true,
     },
   });
 
@@ -435,13 +431,8 @@ export async function sendInvoiceReminder(
     return { success: false, error: 'Invoice not found' };
   }
 
-  const recipientEmail =
-    invoice.facility.billingEmail || invoice.facility.billingContact?.email;
-  const recipientName =
-    invoice.facility.billingContactName ||
-    (invoice.facility.billingContact
-      ? `${invoice.facility.billingContact.firstName} ${invoice.facility.billingContact.lastName}`
-      : invoice.facility.name);
+  const recipientEmail = invoice.facility.billingEmail || invoice.facility.email;
+  const recipientName = invoice.facility.billingContactName || invoice.facility.name;
 
   if (!recipientEmail) {
     return { success: false, error: 'No billing email configured' };
@@ -510,11 +501,7 @@ export async function sendPaymentConfirmation(
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
-      facility: {
-        include: {
-          billingContact: true,
-        },
-      },
+      facility: true,
     },
   });
 
@@ -522,13 +509,8 @@ export async function sendPaymentConfirmation(
     return { success: false, error: 'Invoice not found' };
   }
 
-  const recipientEmail =
-    invoice.facility.billingEmail || invoice.facility.billingContact?.email;
-  const recipientName =
-    invoice.facility.billingContactName ||
-    (invoice.facility.billingContact
-      ? `${invoice.facility.billingContact.firstName} ${invoice.facility.billingContact.lastName}`
-      : invoice.facility.name);
+  const recipientEmail = invoice.facility.billingEmail || invoice.facility.email;
+  const recipientName = invoice.facility.billingContactName || invoice.facility.name;
 
   if (!recipientEmail) {
     return { success: false, error: 'No billing email configured' };

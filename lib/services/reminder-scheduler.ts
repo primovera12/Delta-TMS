@@ -48,7 +48,7 @@ export async function getTripsFor24HourReminder(): Promise<
         in: [TripStatus.CONFIRMED, TripStatus.ASSIGNED],
       },
       // Check if 24h reminder was already sent
-      notificationLogs: {
+      notifications: {
         none: {
           type: 'REMINDER_24H',
         },
@@ -66,7 +66,16 @@ export async function getTripsFor24HourReminder(): Promise<
     },
   });
 
-  return trips;
+  // Transform trips to match expected return type
+  return trips.map((trip) => ({
+    id: trip.id,
+    scheduledPickupTime: trip.scheduledPickupTime,
+    pickupAddress: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState} ${trip.pickupZipCode}`,
+    passengers: trip.passengers.map((p) => ({
+      isPrimary: p.isPrimary,
+      user: { phone: p.user?.phone || '' },
+    })),
+  }));
 }
 
 /**
@@ -99,7 +108,7 @@ export async function getTripsFor1HourReminder(): Promise<
       status: {
         in: [TripStatus.CONFIRMED, TripStatus.ASSIGNED],
       },
-      notificationLogs: {
+      notifications: {
         none: {
           type: 'REMINDER_1H',
         },
@@ -124,7 +133,17 @@ export async function getTripsFor1HourReminder(): Promise<
     },
   });
 
-  return trips;
+  // Transform trips to match expected return type
+  return trips.map((trip) => ({
+    id: trip.id,
+    scheduledPickupTime: trip.scheduledPickupTime,
+    pickupAddress: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState} ${trip.pickupZipCode}`,
+    passengers: trip.passengers.map((p) => ({
+      isPrimary: p.isPrimary,
+      user: { phone: p.user?.phone || '' },
+    })),
+    driver: trip.driver ? { user: { firstName: trip.driver.user.firstName } } : null,
+  }));
 }
 
 /**
@@ -262,8 +281,8 @@ export async function notifyDriversOfUpcomingTrips(): Promise<{
       const result = await DriverNotifications.sendNewAssignment(trip.driver.user.phone, {
         id: trip.id,
         scheduledPickupTime: trip.scheduledPickupTime,
-        pickupAddress: trip.pickupAddress,
-        dropoffAddress: trip.dropoffAddress,
+        pickupAddress: `${trip.pickupAddressLine1}, ${trip.pickupCity}, ${trip.pickupState} ${trip.pickupZipCode}`,
+        dropoffAddress: `${trip.dropoffAddressLine1}, ${trip.dropoffCity}, ${trip.dropoffState} ${trip.dropoffZipCode}`,
         patient: patient || null,
       });
 

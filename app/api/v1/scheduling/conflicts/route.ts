@@ -59,8 +59,6 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        pickupAddress: true,
-        dropoffAddress: true,
       },
       orderBy: {
         scheduledPickupTime: 'asc',
@@ -141,12 +139,12 @@ export async function GET(request: NextRequest) {
           const trip1Start = new Date(trip1.scheduledPickupTime);
           const trip1End = trip1.actualDropoffTime
             ? new Date(trip1.actualDropoffTime)
-            : new Date(trip1Start.getTime() + (trip1.estimatedDuration || 60) * 60 * 1000);
+            : new Date(trip1Start.getTime() + (trip1.estimatedDurationMinutes || 60) * 60 * 1000);
 
           const trip2Start = new Date(trip2.scheduledPickupTime);
           const trip2End = trip2.actualDropoffTime
             ? new Date(trip2.actualDropoffTime)
-            : new Date(trip2Start.getTime() + (trip2.estimatedDuration || 60) * 60 * 1000);
+            : new Date(trip2Start.getTime() + (trip2.estimatedDurationMinutes || 60) * 60 * 1000);
 
           // Check for overlap
           if (trip1Start < trip2End && trip1End > trip2Start) {
@@ -168,14 +166,14 @@ export async function GET(request: NextRequest) {
                   id: trip1.id,
                   startTime: trip1Start.toISOString(),
                   endTime: trip1End.toISOString(),
-                  details: `Trip to ${trip1.dropoffAddress?.city || 'destination'}`,
+                  details: `Trip to ${trip1.dropoffCity || 'destination'}`,
                 },
                 {
                   type: 'trip',
                   id: trip2.id,
                   startTime: trip2Start.toISOString(),
                   endTime: trip2End.toISOString(),
-                  details: `Trip to ${trip2.dropoffAddress?.city || 'destination'}`,
+                  details: `Trip to ${trip2.dropoffCity || 'destination'}`,
                 },
               ],
               suggestedResolution: 'Reassign one trip to another available driver',
@@ -245,9 +243,9 @@ export async function GET(request: NextRequest) {
                 id: trip.id,
                 startTime: trip.scheduledPickupTime.toISOString(),
                 endTime: new Date(
-                  trip.scheduledPickupTime.getTime() + (trip.estimatedDuration || 60) * 60 * 1000
+                  trip.scheduledPickupTime.getTime() + (trip.estimatedDurationMinutes || 60) * 60 * 1000
                 ).toISOString(),
-                details: `Trip to ${trip.dropoffAddress?.city || 'destination'}`,
+                details: `Trip to ${trip.dropoffCity || 'destination'}`,
               },
             ],
             suggestedResolution: 'Reassign trip to an available driver',
@@ -297,7 +295,7 @@ export async function GET(request: NextRequest) {
                 id: trip.id,
                 startTime: trip.scheduledPickupTime.toISOString(),
                 endTime: new Date(
-                  trip.scheduledPickupTime.getTime() + (trip.estimatedDuration || 60) * 60 * 1000
+                  trip.scheduledPickupTime.getTime() + (trip.estimatedDurationMinutes || 60) * 60 * 1000
                 ).toISOString(),
                 details: `Trip at ${tripTimeStr}`,
               },
