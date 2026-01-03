@@ -15,11 +15,10 @@ import {
   RefreshCw,
   ChevronRight,
   AlertCircle,
-  TrendingUp,
   Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -71,8 +70,23 @@ const mockComplianceItems: ComplianceItem[] = [
   { id: '15', category: 'training', name: 'Wheelchair Securement - Mike Davis', status: 'expired', expirationDate: '2024-01-10', lastUpdated: '2023-01-10', owner: 'Mike Davis' },
 ];
 
+// Safe date formatting function
+function formatDate(dateString: string | undefined): string {
+  if (!dateString) return 'N/A';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return 'Invalid date';
+  }
+}
+
 export default function AdminCompliancePage() {
-  const [complianceItems, setComplianceItems] = React.useState<ComplianceItem[]>(mockComplianceItems);
   const [activeTab, setActiveTab] = React.useState('overview');
   const [refreshing, setRefreshing] = React.useState(false);
 
@@ -89,9 +103,9 @@ export default function AdminCompliancePage() {
       case 'expiring':
         return <Badge variant="warning">Expiring Soon</Badge>;
       case 'expired':
-        return <Badge variant="destructive">Expired</Badge>;
+        return <Badge variant="error">Expired</Badge>;
       case 'missing':
-        return <Badge variant="destructive">Missing</Badge>;
+        return <Badge variant="error">Missing</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -127,19 +141,19 @@ export default function AdminCompliancePage() {
     }
   };
 
-  const expiredCount = complianceItems.filter((i) => i.status === 'expired' || i.status === 'missing').length;
-  const expiringCount = complianceItems.filter((i) => i.status === 'expiring').length;
-  const compliantCount = complianceItems.filter((i) => i.status === 'compliant').length;
-  const overallComplianceRate = Math.round((compliantCount / complianceItems.length) * 100);
+  const expiredCount = mockComplianceItems.filter((i) => i.status === 'expired' || i.status === 'missing').length;
+  const expiringCount = mockComplianceItems.filter((i) => i.status === 'expiring').length;
+  const compliantCount = mockComplianceItems.filter((i) => i.status === 'compliant').length;
+  const overallComplianceRate = Math.round((compliantCount / mockComplianceItems.length) * 100);
 
   const itemsByCategory = {
-    driver: complianceItems.filter((i) => i.category === 'driver'),
-    vehicle: complianceItems.filter((i) => i.category === 'vehicle'),
-    company: complianceItems.filter((i) => i.category === 'company'),
-    training: complianceItems.filter((i) => i.category === 'training'),
+    driver: mockComplianceItems.filter((i) => i.category === 'driver'),
+    vehicle: mockComplianceItems.filter((i) => i.category === 'vehicle'),
+    company: mockComplianceItems.filter((i) => i.category === 'company'),
+    training: mockComplianceItems.filter((i) => i.category === 'training'),
   };
 
-  const urgentItems = complianceItems.filter((i) => i.status === 'expired' || i.status === 'missing' || i.status === 'expiring');
+  const urgentItems = mockComplianceItems.filter((i) => i.status === 'expired' || i.status === 'missing' || i.status === 'expiring');
 
   return (
     <div className="space-y-6">
@@ -219,7 +233,7 @@ export default function AdminCompliancePage() {
                       ? 'success'
                       : metric.status === 'warning'
                       ? 'warning'
-                      : 'destructive'
+                      : 'error'
                   }
                 >
                   {metric.value}/{metric.total}
@@ -262,7 +276,7 @@ export default function AdminCompliancePage() {
                       <p className="font-medium text-gray-900">{item.name}</p>
                       <p className="text-sm text-gray-500">
                         {item.expirationDate
-                          ? `Expires: ${new Date(item.expirationDate).toLocaleDateString()}`
+                          ? `Expires: ${formatDate(item.expirationDate)}`
                           : item.details}
                       </p>
                     </div>
@@ -275,7 +289,7 @@ export default function AdminCompliancePage() {
               ))}
             </div>
             {urgentItems.length > 5 && (
-              <Button variant="link" className="mt-2">
+              <Button variant="ghost" className="mt-2">
                 View all {urgentItems.length} items
               </Button>
             )}
@@ -290,7 +304,7 @@ export default function AdminCompliancePage() {
           <TabsTrigger value="drivers">
             Drivers
             {itemsByCategory.driver.filter((i) => i.status !== 'compliant').length > 0 && (
-              <Badge variant="destructive" className="ml-2">
+              <Badge variant="error" className="ml-2">
                 {itemsByCategory.driver.filter((i) => i.status !== 'compliant').length}
               </Badge>
             )}
@@ -337,7 +351,7 @@ export default function AdminCompliancePage() {
                     </div>
                     {items.length > 4 && (
                       <Button
-                        variant="link"
+                        variant="ghost"
                         className="mt-2 p-0"
                         onClick={() => setActiveTab(category === 'driver' ? 'drivers' : category)}
                       >
@@ -371,7 +385,7 @@ export default function AdminCompliancePage() {
                               {item.expirationDate && (
                                 <span className="flex items-center gap-1">
                                   <Calendar className="h-4 w-4" />
-                                  Expires: {new Date(item.expirationDate).toLocaleDateString()}
+                                  Expires: {formatDate(item.expirationDate)}
                                 </span>
                               )}
                               {item.details && <span>{item.details}</span>}
@@ -380,7 +394,7 @@ export default function AdminCompliancePage() {
                         </div>
                         <div className="flex items-center gap-3">
                           {getStatusBadge(item.status)}
-                          <Button variant="outline" size="sm">
+                          <Button variant="secondary" size="sm">
                             Update
                           </Button>
                         </div>
