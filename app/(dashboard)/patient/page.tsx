@@ -14,84 +14,142 @@ import {
   CheckCircle,
   AlertCircle,
   User,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-// Mock data
-const upcomingTrip = {
-  id: 'TR-20260115-012',
-  date: 'Tomorrow, January 16',
-  pickupTime: '10:30 AM',
-  appointmentTime: '11:00 AM',
-  pickup: {
-    address: '123 Main St, Houston, TX 77001',
-    instructions: 'Wait at front door',
-  },
-  dropoff: {
-    address: 'Memorial Hospital, 6400 Fannin St',
-    department: 'Cardiology, 3rd Floor',
-  },
-  driver: {
-    name: 'Mike Johnson',
-    phone: '(555) 123-4567',
-    rating: 4.9,
-    vehicle: '2022 Toyota Sienna',
-    licensePlate: 'ABC-1234',
-  },
-  vehicleType: 'wheelchair',
-  status: 'confirmed',
-};
+interface Trip {
+  id: string;
+  tripNumber: string;
+  status: string;
+  scheduledPickupTime: string;
+  pickupAddressLine1: string;
+  pickupCity: string;
+  dropoffAddressLine1: string;
+  dropoffCity: string;
+  driver?: {
+    rating: number;
+    user: {
+      firstName: string;
+      lastName: string;
+      phone: string;
+    };
+  };
+  vehicle?: {
+    make: string;
+    model: string;
+    licensePlate: string;
+  };
+}
 
-const pastTrips = [
-  {
-    id: 'TR-20260113-008',
-    date: 'January 13, 2026',
-    pickup: '123 Main St',
-    dropoff: 'Dialysis Center',
-    driver: 'Sarah Williams',
-    status: 'completed',
-    rating: 5,
-  },
-  {
-    id: 'TR-20260110-015',
-    date: 'January 10, 2026',
-    pickup: '123 Main St',
-    dropoff: 'City Clinic',
-    driver: 'David Lee',
-    status: 'completed',
-    rating: 4,
-  },
-  {
-    id: 'TR-20260108-022',
-    date: 'January 8, 2026',
-    pickup: 'Heart Center',
-    dropoff: '123 Main St',
-    driver: 'Mike Johnson',
-    status: 'completed',
-    rating: 5,
-  },
-];
+interface StandingOrder {
+  id: string;
+  name: string;
+  frequency: string;
+  isActive: boolean;
+  pickupCity: string;
+  dropoffCity: string;
+}
 
-const standingOrders = [
-  {
-    id: 'SO-001',
-    type: 'Dialysis',
-    schedule: 'Mon, Wed, Fri at 8:00 AM',
-    destination: 'City Dialysis Center',
-    active: true,
-  },
-];
+interface UserProfile {
+  firstName: string;
+  lastName: string;
+}
 
 export default function PatientDashboardPage() {
+  const [profile, setProfile] = React.useState<UserProfile | null>(null);
+  const [upcomingTrips, setUpcomingTrips] = React.useState<Trip[]>([]);
+  const [pastTrips, setPastTrips] = React.useState<Trip[]>([]);
+  const [standingOrders, setStandingOrders] = React.useState<StandingOrder[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchData() {
+      try {
+        const [profileRes, tripsRes, pastTripsRes, ordersRes] = await Promise.all([
+          fetch('/api/v1/patients/me'),
+          fetch('/api/v1/trips?status=pending,confirmed,assigned&limit=1'),
+          fetch('/api/v1/trips?status=completed&limit=3'),
+          fetch('/api/v1/standing-orders?limit=3'),
+        ]);
+
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          setProfile(data.data);
+        }
+
+        if (tripsRes.ok) {
+          const data = await tripsRes.json();
+          setUpcomingTrips(data.data || []);
+        }
+
+        if (pastTripsRes.ok) {
+          const data = await pastTripsRes.json();
+          setPastTrips(data.data || []);
+        }
+
+        if (ordersRes.ok) {
+          const data = await ordersRes.json();
+          setStandingOrders(data.data || []);
+        }
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-2 text-sm text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const upcomingTrip = upcomingTrips[0];
+  const firstName = profile?.firstName || 'there';
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === tomorrow.toDateString()) {
+      return 'Tomorrow';
+    }
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Welcome back, John</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Welcome back, {firstName}</h1>
           <p className="text-sm text-gray-500">
             Here&apos;s your upcoming transportation
           </p>
@@ -105,7 +163,7 @@ export default function PatientDashboardPage() {
       </div>
 
       {/* Upcoming Trip Card */}
-      {upcomingTrip && (
+      {upcomingTrip ? (
         <Card className="border-primary-200 bg-gradient-to-r from-primary-50 to-white">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -113,14 +171,18 @@ export default function PatientDashboardPage() {
                 <Calendar className="h-5 w-5 text-primary-600" />
                 Upcoming Trip
               </CardTitle>
-              <Badge variant="confirmed">Confirmed</Badge>
+              <Badge variant="confirmed">{upcomingTrip.status.replace('_', ' ')}</Badge>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Date and Time */}
             <div className="flex items-center gap-4 text-lg">
-              <span className="font-semibold text-gray-900">{upcomingTrip.date}</span>
-              <span className="text-primary-600 font-bold">{upcomingTrip.pickupTime}</span>
+              <span className="font-semibold text-gray-900">
+                {formatDate(upcomingTrip.scheduledPickupTime)}
+              </span>
+              <span className="text-primary-600 font-bold">
+                {formatTime(upcomingTrip.scheduledPickupTime)}
+              </span>
             </div>
 
             {/* Route */}
@@ -131,10 +193,9 @@ export default function PatientDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Pickup</p>
-                  <p className="font-medium text-gray-900">{upcomingTrip.pickup.address}</p>
-                  {upcomingTrip.pickup.instructions && (
-                    <p className="text-sm text-gray-500">{upcomingTrip.pickup.instructions}</p>
-                  )}
+                  <p className="font-medium text-gray-900">
+                    {upcomingTrip.pickupAddressLine1}, {upcomingTrip.pickupCity}
+                  </p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -143,49 +204,49 @@ export default function PatientDashboardPage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Dropoff</p>
-                  <p className="font-medium text-gray-900">{upcomingTrip.dropoff.address}</p>
-                  <p className="text-sm text-gray-500">{upcomingTrip.dropoff.department}</p>
+                  <p className="font-medium text-gray-900">
+                    {upcomingTrip.dropoffAddressLine1}, {upcomingTrip.dropoffCity}
+                  </p>
                 </div>
               </div>
-            </div>
-
-            {/* Appointment Info */}
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-info-50">
-              <Clock className="h-5 w-5 text-info-600" />
-              <p className="text-sm text-info-700">
-                Appointment at <span className="font-semibold">{upcomingTrip.appointmentTime}</span>
-              </p>
             </div>
 
             {/* Driver Info */}
-            <div className="p-4 rounded-lg bg-white border border-gray-200">
-              <p className="text-sm font-medium text-gray-500 mb-3">Your Driver</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Avatar size="lg">
-                    <AvatarFallback>
-                      {upcomingTrip.driver.name.split(' ').map((n) => n[0]).join('')}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-semibold text-gray-900">{upcomingTrip.driver.name}</p>
-                    <div className="flex items-center gap-1 text-sm text-gray-500">
-                      <Star className="h-4 w-4 text-warning-500 fill-warning-500" />
-                      <span>{upcomingTrip.driver.rating}</span>
+            {upcomingTrip.driver && (
+              <div className="p-4 rounded-lg bg-white border border-gray-200">
+                <p className="text-sm font-medium text-gray-500 mb-3">Your Driver</p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar size="lg">
+                      <AvatarFallback>
+                        {upcomingTrip.driver.user.firstName[0]}
+                        {upcomingTrip.driver.user.lastName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {upcomingTrip.driver.user.firstName} {upcomingTrip.driver.user.lastName}
+                      </p>
+                      <div className="flex items-center gap-1 text-sm text-gray-500">
+                        <Star className="h-4 w-4 text-warning-500 fill-warning-500" />
+                        <span>{upcomingTrip.driver.rating.toFixed(1)}</span>
+                      </div>
                     </div>
                   </div>
+                  <Button variant="secondary">
+                    <Phone className="h-4 w-4 mr-2" />
+                    Call
+                  </Button>
                 </div>
-                <Button variant="secondary">
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call
-                </Button>
+                {upcomingTrip.vehicle && (
+                  <div className="mt-3 pt-3 border-t border-gray-100">
+                    <p className="text-sm text-gray-500">
+                      {upcomingTrip.vehicle.make} {upcomingTrip.vehicle.model} • {upcomingTrip.vehicle.licensePlate}
+                    </p>
+                  </div>
+                )}
               </div>
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <p className="text-sm text-gray-500">
-                  {upcomingTrip.driver.vehicle} • {upcomingTrip.driver.licensePlate}
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* Actions */}
             <div className="flex gap-3">
@@ -200,9 +261,7 @@ export default function PatientDashboardPage() {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {!upcomingTrip && (
+      ) : (
         <Card className="py-12 text-center">
           <Car className="mx-auto h-12 w-12 text-gray-300" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">No Upcoming Trips</h3>
@@ -239,19 +298,19 @@ export default function PatientDashboardPage() {
                     className="p-4 rounded-lg border border-gray-200"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <p className="font-medium text-gray-900">{order.type}</p>
-                      <Badge variant={order.active ? 'success' : 'secondary'}>
-                        {order.active ? 'Active' : 'Paused'}
+                      <p className="font-medium text-gray-900">{order.name}</p>
+                      <Badge variant={order.isActive ? 'success' : 'secondary'}>
+                        {order.isActive ? 'Active' : 'Paused'}
                       </Badge>
                     </div>
                     <div className="space-y-1 text-sm text-gray-500">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>{order.schedule}</span>
+                        <span>{order.frequency}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4" />
-                        <span>{order.destination}</span>
+                        <span>{order.pickupCity} → {order.dropoffCity}</span>
                       </div>
                     </div>
                   </div>
@@ -270,7 +329,7 @@ export default function PatientDashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Recent Trips</CardTitle>
-            <Link href="/patient/history">
+            <Link href="/patient/trips/history">
               <Button variant="ghost" size="sm">
                 View All
                 <ChevronRight className="h-4 w-4 ml-1" />
@@ -278,29 +337,31 @@ export default function PatientDashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {pastTrips.map((trip) => (
-                <div
-                  key={trip.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium text-gray-900">{trip.date}</p>
-                    <p className="text-sm text-gray-500">
-                      {trip.pickup} → {trip.dropoff}
-                    </p>
+            {pastTrips.length > 0 ? (
+              <div className="space-y-3">
+                {pastTrips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {formatDate(trip.scheduledPickupTime)}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {trip.pickupCity} → {trip.dropoffCity}
+                      </p>
+                    </div>
+                    <Badge variant="success">Completed</Badge>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: trip.rating }).map((_, i) => (
-                      <Star
-                        key={i}
-                        className="h-4 w-4 text-warning-500 fill-warning-500"
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6">
+                <Car className="mx-auto h-10 w-10 text-gray-300" />
+                <p className="mt-2 text-sm text-gray-500">No past trips yet</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

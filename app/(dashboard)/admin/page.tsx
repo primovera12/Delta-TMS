@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import {
   Users,
   Car,
@@ -11,6 +14,7 @@ import {
   FileText,
   Shield,
   Settings,
+  Loader2,
 } from 'lucide-react';
 import { StatCard } from '@/components/domain/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,98 +24,35 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 
-// Mock data
-const systemStats = {
-  totalUsers: 156,
-  activeDrivers: 42,
-  activeFacilities: 18,
-  monthlyRevenue: 128450,
-  tripsThisMonth: 3240,
-  avgTripRating: 4.7,
-};
-
-const recentActivity = [
-  {
-    id: '1',
-    type: 'user_created',
-    message: 'New driver registered: John Smith',
-    time: '5 min ago',
-    icon: Users,
-  },
-  {
-    id: '2',
-    type: 'trip_completed',
-    message: 'Trip TR-20260115-012 completed successfully',
-    time: '12 min ago',
-    icon: CheckCircle,
-  },
-  {
-    id: '3',
-    type: 'facility_added',
-    message: 'New facility added: Memorial Hospital',
-    time: '1 hour ago',
-    icon: Building2,
-  },
-  {
-    id: '4',
-    type: 'vehicle_inspection',
-    message: 'Vehicle ABC-1234 passed inspection',
-    time: '2 hours ago',
-    icon: Car,
-  },
-  {
-    id: '5',
-    type: 'payment_processed',
-    message: 'Weekly payments processed: $45,230',
-    time: '3 hours ago',
-    icon: DollarSign,
-  },
-];
-
-const pendingApprovals = [
-  {
-    id: '1',
-    type: 'driver',
-    name: 'Robert Johnson',
-    status: 'pending_verification',
-    submitted: '2 days ago',
-  },
-  {
-    id: '2',
-    type: 'driver',
-    name: 'Sarah Williams',
-    status: 'pending_documents',
-    submitted: '3 days ago',
-  },
-  {
-    id: '3',
-    type: 'facility',
-    name: 'City Medical Center',
-    status: 'pending_contract',
-    submitted: '1 day ago',
-  },
-];
-
-const systemAlerts = [
-  {
-    type: 'warning',
-    message: '3 driver licenses expiring within 30 days',
-    action: 'View Details',
-    link: '/admin/compliance',
-  },
-  {
-    type: 'warning',
-    message: '2 vehicles due for maintenance',
-    action: 'Schedule',
-    link: '/admin/vehicles',
-  },
-  {
-    type: 'info',
-    message: 'System backup completed successfully',
-    action: 'View Logs',
-    link: '/admin/settings',
-  },
-];
+interface DashboardStats {
+  totalUsers: number;
+  activeDrivers: number;
+  totalFacilities: number;
+  totalVehicles: number;
+  activeVehicles: number;
+  tripsThisMonth: number;
+  tripChange: number;
+  completedTripsThisMonth: number;
+  pendingTrips: number;
+  inProgressTrips: number;
+  tripsToday: number;
+  monthlyRevenue: number;
+  revenueChange: number;
+  outstandingInvoices: number;
+  outstandingInvoiceCount: number;
+  pendingApprovals: Array<{
+    id: string;
+    name: string;
+    type: string;
+    submitted: string;
+  }>;
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    message: string;
+    time: string;
+  }>;
+}
 
 const quickLinks = [
   { label: 'Manage Users', icon: Users, href: '/admin/users', color: 'bg-primary-100 text-primary-600' },
@@ -122,7 +63,63 @@ const quickLinks = [
   { label: 'Settings', icon: Settings, href: '/admin/settings', color: 'bg-gray-100 text-gray-600' },
 ];
 
+const activityIcons: Record<string, typeof Users> = {
+  trip_pending: Clock,
+  trip_confirmed: CheckCircle,
+  trip_completed: CheckCircle,
+  trip_cancelled: AlertTriangle,
+  trip_in_progress: Activity,
+  trip_assigned: Car,
+  default: Activity,
+};
+
 export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const response = await fetch('/api/v1/dashboard/stats?portal=admin');
+        if (!response.ok) throw new Error('Failed to fetch stats');
+        const result = await response.json();
+        setStats(result.data);
+      } catch (err) {
+        setError('Failed to load dashboard data');
+        console.error(err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchStats();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-2 text-sm text-gray-500">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <AlertTriangle className="h-8 w-8 text-error-500 mx-auto" />
+          <p className="mt-2 text-sm text-gray-500">{error || 'Failed to load dashboard'}</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -134,14 +131,18 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button variant="secondary">
-            <FileText className="h-4 w-4 mr-2" />
-            Generate Report
-          </Button>
-          <Button>
-            <Settings className="h-4 w-4 mr-2" />
-            System Settings
-          </Button>
+          <Link href="/admin/reports">
+            <Button variant="secondary">
+              <FileText className="h-4 w-4 mr-2" />
+              Generate Report
+            </Button>
+          </Link>
+          <Link href="/admin/settings">
+            <Button>
+              <Settings className="h-4 w-4 mr-2" />
+              System Settings
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -149,35 +150,35 @@ export default function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Users"
-          value={systemStats.totalUsers}
+          value={stats.totalUsers}
           change={8}
-          changeLabel="this month"
+          changeLabel="registered"
           icon={<Users className="h-6 w-6" />}
           trend="up"
         />
         <StatCard
           title="Active Drivers"
-          value={systemStats.activeDrivers}
-          change={5}
-          changeLabel="vs last week"
+          value={stats.activeDrivers}
+          change={stats.activeDrivers}
+          changeLabel="available"
           icon={<Car className="h-6 w-6" />}
           trend="up"
         />
         <StatCard
           title="Monthly Revenue"
-          value={`$${systemStats.monthlyRevenue.toLocaleString()}`}
-          change={12}
+          value={`$${stats.monthlyRevenue.toLocaleString()}`}
+          change={stats.revenueChange}
           changeLabel="vs last month"
           icon={<DollarSign className="h-6 w-6" />}
-          trend="up"
+          trend={stats.revenueChange >= 0 ? 'up' : 'down'}
         />
         <StatCard
           title="Trips This Month"
-          value={systemStats.tripsThisMonth.toLocaleString()}
-          change={15}
+          value={stats.tripsThisMonth.toLocaleString()}
+          change={stats.tripChange}
           changeLabel="vs last month"
           icon={<Activity className="h-6 w-6" />}
-          trend="up"
+          trend={stats.tripChange >= 0 ? 'up' : 'down'}
         />
       </div>
 
@@ -206,62 +207,67 @@ export default function AdminDashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Activity</CardTitle>
-            <Button variant="ghost" size="sm">View All</Button>
+            <Link href="/admin/rides">
+              <Button variant="ghost" size="sm">View All</Button>
+            </Link>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity) => {
-                const Icon = activity.icon;
-                return (
-                  <div
-                    key={activity.id}
-                    className="flex items-start gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      <Icon className="h-5 w-5 text-gray-600" />
+              {stats.recentActivity.length > 0 ? (
+                stats.recentActivity.map((activity) => {
+                  const Icon = activityIcons[activity.type] || activityIcons.default;
+                  return (
+                    <div
+                      key={activity.id}
+                      className="flex items-start gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                        <Icon className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900">{activity.message}</p>
+                        <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900">{activity.message}</p>
-                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4">No recent activity</p>
+              )}
             </div>
           </CardContent>
         </Card>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* System Alerts */}
+          {/* Quick Stats */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">System Alerts</CardTitle>
+              <CardTitle className="text-lg">Today&apos;s Overview</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {systemAlerts.map((alert, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-3 p-3 rounded-lg ${
-                      alert.type === 'warning' ? 'bg-warning-50' : 'bg-info-50'
-                    }`}
-                  >
-                    {alert.type === 'warning' ? (
-                      <AlertTriangle className="h-5 w-5 text-warning-500 flex-shrink-0" />
-                    ) : (
-                      <CheckCircle className="h-5 w-5 text-info-500 flex-shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700">{alert.message}</p>
-                      <Link href={alert.link}>
-                        <Button variant="link" size="sm" className="p-0 h-auto mt-1">
-                          {alert.action}
-                        </Button>
-                      </Link>
-                    </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-primary-50">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-primary-500" />
+                    <span className="text-sm text-gray-700">Trips Today</span>
                   </div>
-                ))}
+                  <span className="font-semibold text-primary-600">{stats.tripsToday}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-warning-50">
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-5 w-5 text-warning-500" />
+                    <span className="text-sm text-gray-700">Pending</span>
+                  </div>
+                  <span className="font-semibold text-warning-600">{stats.pendingTrips}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-info-50">
+                  <div className="flex items-center gap-3">
+                    <Activity className="h-5 w-5 text-info-500" />
+                    <span className="text-sm text-gray-700">In Progress</span>
+                  </div>
+                  <span className="font-semibold text-info-600">{stats.inProgressTrips}</span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -270,33 +276,39 @@ export default function AdminDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Pending Approvals</CardTitle>
-              <Badge variant="warning">{pendingApprovals.length}</Badge>
+              <Badge variant="warning">{stats.pendingApprovals.length}</Badge>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {pendingApprovals.map((approval) => (
-                  <div
-                    key={approval.id}
-                    className="flex items-center justify-between p-3 rounded-lg border border-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar size="sm">
-                        <AvatarFallback>
-                          {approval.name.split(' ').map((n) => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">{approval.name}</p>
-                        <p className="text-xs text-gray-500 capitalize">{approval.type}</p>
+                {stats.pendingApprovals.length > 0 ? (
+                  stats.pendingApprovals.map((approval) => (
+                    <div
+                      key={approval.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-gray-100"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar size="sm">
+                          <AvatarFallback>
+                            {approval.name.split(' ').map((n) => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{approval.name}</p>
+                          <p className="text-xs text-gray-500 capitalize">{approval.type}</p>
+                        </div>
                       </div>
+                      <Link href={`/admin/users/${approval.id}`}>
+                        <Button size="sm" variant="secondary">
+                          Review
+                        </Button>
+                      </Link>
                     </div>
-                    <Button size="sm" variant="secondary">
-                      Review
-                    </Button>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  <p className="text-sm text-gray-500 text-center py-4">No pending approvals</p>
+                )}
               </div>
-              <Link href="/admin/approvals">
+              <Link href="/admin/users?status=pending">
                 <Button variant="ghost" className="w-full mt-4">
                   View All Pending
                 </Button>
@@ -307,29 +319,29 @@ export default function AdminDashboardPage() {
           {/* System Health */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">System Health</CardTitle>
+              <CardTitle className="text-lg">System Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">API Response</span>
-                  <span className="font-medium text-success-600">99.9%</span>
+                  <span className="text-gray-500">Active Facilities</span>
+                  <span className="font-medium text-gray-900">{stats.totalFacilities}</span>
                 </div>
-                <Progress value={99.9} />
+                <Progress value={100} />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">Database Load</span>
-                  <span className="font-medium text-success-600">42%</span>
+                  <span className="text-gray-500">Active Vehicles</span>
+                  <span className="font-medium text-gray-900">{stats.activeVehicles} / {stats.totalVehicles}</span>
                 </div>
-                <Progress value={42} />
+                <Progress value={stats.totalVehicles > 0 ? (stats.activeVehicles / stats.totalVehicles) * 100 : 0} />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-2">
-                  <span className="text-gray-500">Storage Used</span>
-                  <span className="font-medium text-warning-600">68%</span>
+                  <span className="text-gray-500">Outstanding Invoices</span>
+                  <span className="font-medium text-warning-600">${stats.outstandingInvoices.toLocaleString()}</span>
                 </div>
-                <Progress value={68} />
+                <p className="text-xs text-gray-500">{stats.outstandingInvoiceCount} invoices pending</p>
               </div>
               <div className="pt-2 border-t border-gray-100">
                 <div className="flex items-center gap-2 text-sm text-gray-500">
