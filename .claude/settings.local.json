@@ -34,7 +34,8 @@
       "Bash(wc:*)",
       "Bash(grep:*)",
       "Bash(done)",
-      "Bash(cut:*)"
+      "Bash(cut:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix patient profile page to use real API instead of mock data\n\n- Remove hardcoded mock data\n- Fetch profile from /api/v1/patients/me on mount\n- Save changes via PUT request to the API\n- Add loading state while fetching\n- Handle empty/missing data gracefully\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

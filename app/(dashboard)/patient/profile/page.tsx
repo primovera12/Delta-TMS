@@ -71,61 +71,107 @@ interface PatientProfile {
   emergencyContact: EmergencyContact;
 }
 
-// Mock data
-const mockProfile: PatientProfile = {
-  id: '1',
-  firstName: 'John',
-  lastName: 'Smith',
-  email: 'john.smith@email.com',
-  phone: '(555) 123-4567',
-  dateOfBirth: '1955-03-15',
-  addresses: [
-    {
-      id: '1',
-      label: 'Home',
-      addressLine1: '123 Oak Street',
-      city: 'Houston',
-      state: 'TX',
-      zipCode: '77001',
-      isDefault: true,
-    },
-    {
-      id: '2',
-      label: 'Daughter\'s House',
-      addressLine1: '456 Elm Avenue',
-      city: 'Houston',
-      state: 'TX',
-      zipCode: '77002',
-      isDefault: false,
-    },
-  ],
+// Default empty profile for loading state
+const emptyProfile: PatientProfile = {
+  id: '',
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  dateOfBirth: '',
+  addresses: [],
   medicalProfile: {
-    mobilityStatus: 'wheelchair',
-    mobilityAids: ['Manual Wheelchair'],
+    mobilityStatus: 'ambulatory',
+    mobilityAids: [],
     requiresOxygen: false,
     requiresAttendant: false,
-    wheelchairType: 'standard',
-    allergies: ['Penicillin'],
-    medications: ['Metformin', 'Lisinopril'],
-    specialNeeds: 'Patient prefers to sit on the right side of the vehicle.',
-    weightLbs: 175,
+    wheelchairType: null,
+    allergies: [],
+    medications: [],
+    specialNeeds: '',
+    weightLbs: null,
   },
   emergencyContact: {
-    name: 'Mary Smith',
-    relationship: 'Daughter',
-    phone: '(555) 234-5678',
+    name: '',
+    relationship: '',
+    phone: '',
   },
 };
 
 export default function PatientProfilePage() {
-  const [profile, setProfile] = React.useState<PatientProfile>(mockProfile);
+  const [profile, setProfile] = React.useState<PatientProfile>(emptyProfile);
   const [isEditing, setIsEditing] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
 
   // Temporary form data for editing
   const [formData, setFormData] = React.useState(profile);
+
+  // Fetch profile data on mount
+  React.useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const response = await fetch('/api/v1/patients/me');
+        if (!response.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        const result = await response.json();
+        const data = result.data;
+
+        // Transform API response to match our interface
+        const transformedProfile: PatientProfile = {
+          id: data.id,
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          dateOfBirth: data.dateOfBirth || '',
+          addresses: (data.savedAddresses || []).map((addr: Record<string, unknown>) => ({
+            id: addr.id as string,
+            label: addr.label as string,
+            addressLine1: addr.addressLine1 as string,
+            addressLine2: addr.addressLine2 as string | undefined,
+            city: addr.city as string,
+            state: addr.state as string,
+            zipCode: addr.zipCode as string,
+            isDefault: addr.label === 'Home',
+          })),
+          medicalProfile: data.medicalProfile ? {
+            mobilityStatus: data.medicalProfile.mobilityStatus || 'ambulatory',
+            mobilityAids: data.medicalProfile.mobilityAids || [],
+            requiresOxygen: data.medicalProfile.requiresOxygen || false,
+            requiresAttendant: data.medicalProfile.requiresAttendant || false,
+            wheelchairType: data.medicalProfile.wheelchairType || null,
+            allergies: typeof data.medicalProfile.allergies === 'string'
+              ? data.medicalProfile.allergies.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : data.medicalProfile.allergies || [],
+            medications: typeof data.medicalProfile.medications === 'string'
+              ? data.medicalProfile.medications.split(',').map((s: string) => s.trim()).filter(Boolean)
+              : data.medicalProfile.medications || [],
+            specialNeeds: data.medicalProfile.specialNeeds || '',
+            weightLbs: data.medicalProfile.weightLbs || null,
+          } : emptyProfile.medicalProfile,
+          emergencyContact: data.emergencyContact ? {
+            name: data.emergencyContact.name || '',
+            relationship: data.emergencyContact.relationship || '',
+            phone: data.emergencyContact.phone || '',
+          } : emptyProfile.emergencyContact,
+        };
+
+        setProfile(transformedProfile);
+        setFormData(transformedProfile);
+      } catch (err) {
+        setError('Failed to load profile. Please refresh the page.');
+        console.error('Error fetching profile:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchProfile();
+  }, []);
 
   const handleStartEdit = () => {
     setFormData(profile);
@@ -144,8 +190,41 @@ export default function PatientProfilePage() {
     setError(null);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/v1/patients/me', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profile: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            dateOfBirth: formData.dateOfBirth,
+          },
+          medicalProfile: {
+            mobilityStatus: formData.medicalProfile.mobilityStatus,
+            mobilityAids: formData.medicalProfile.mobilityAids,
+            requiresOxygen: formData.medicalProfile.requiresOxygen,
+            requiresAttendant: formData.medicalProfile.requiresAttendant,
+            wheelchairType: formData.medicalProfile.wheelchairType,
+            allergies: formData.medicalProfile.allergies,
+            medications: formData.medicalProfile.medications,
+            specialNeeds: formData.medicalProfile.specialNeeds,
+            weightLbs: formData.medicalProfile.weightLbs,
+          },
+          emergencyContact: {
+            name: formData.emergencyContact.name,
+            relationship: formData.emergencyContact.relationship,
+            phone: formData.emergencyContact.phone,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save profile');
+      }
 
       setProfile(formData);
       setIsEditing(false);
@@ -178,6 +257,18 @@ export default function PatientProfilePage() {
     }
     return age;
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-2 text-sm text-gray-500">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -230,7 +321,7 @@ export default function PatientProfilePage() {
           <div className="flex items-center gap-6">
             <Avatar size="xl">
               <AvatarFallback className="text-2xl">
-                {profile.firstName[0]}{profile.lastName[0]}
+                {profile.firstName?.[0] || ''}{profile.lastName?.[0] || ''}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
@@ -238,7 +329,7 @@ export default function PatientProfilePage() {
                 {profile.firstName} {profile.lastName}
               </h2>
               <p className="text-sm text-gray-500">
-                {calculateAge(profile.dateOfBirth)} years old | DOB: {formatDate(profile.dateOfBirth)}
+                {profile.dateOfBirth ? `${calculateAge(profile.dateOfBirth)} years old | DOB: ${formatDate(profile.dateOfBirth)}` : 'Date of birth not set'}
               </p>
               <div className="flex items-center gap-4 mt-2">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
